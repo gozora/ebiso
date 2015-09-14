@@ -62,10 +62,19 @@ int write_files(struct file_list_t *file_list, FILE *dest) {
        */
       if ((mod = rr_file_list->size % BLOCK_SIZE) != 0) {
          if (fwrite(buffer, 1, BLOCK_SIZE - mod, dest) != BLOCK_SIZE - mod) {
-            perror("Error: write_file()");
+            perror("Error: pad()");
             return E_IO;
          }
       }
+      
+      /*
+       * If file is zero size write BLOCK_SIZE of zeros
+       */
+      if (rr_file_list->size == 0)
+         if (fwrite(buffer, 1, BLOCK_SIZE, dest) != BLOCK_SIZE) {
+            perror("Error: pad()");
+            return E_IO;
+         }
       
       fflush(dest);
       
@@ -74,5 +83,5 @@ int write_files(struct file_list_t *file_list, FILE *dest) {
       rr_file_list = rr_file_list->next;
    }
    
-   return 0;
+   return E_OK;
 }

@@ -1,9 +1,9 @@
 /*
- * fill.h
+ * list.h
  * 
- * Version:       0.0.1-alfa
+ * Version:       0.0.2-alfa
  * 
- * Release date:  07.09.2015
+ * Release date:  08.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -27,4 +27,10 @@
 
 #include "globals.h"
 
-int fill(const char *dirname, struct file_list_t **flist);
+/* ebiso.c */
+int list_create(const char *dirname, struct file_list_t **flist);
+void list_clean(struct file_list_t *list_to_clean);
+
+/* iso9660.c */
+struct file_list_t *list_search(struct file_list_t *file_list, char *needle);
+

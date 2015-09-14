@@ -1,9 +1,9 @@
 /*
  * globals.h
  * 
- * Version:       0.0.1-alfa
+ * Version:       0.0.2-alfa
  * 
- * Release date:  07.09.2015
+ * Release date:  08.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -38,12 +38,13 @@
 #define ISO9660_ID "CD001"
 #define SYSTEM_ID "LINUX"
 #define VOLUME_ID "CDROM"
+#define DIR_RECORD_LEN 0x21
 
 static const uint8_t zero = 0;
 static const uint8_t one = 1;
 
 enum errors_l {
-   OK,
+   E_OK,
    E_STATFAIL,
    E_READFAIL,
    E_WRFAIL,
@@ -52,30 +53,42 @@ enum errors_l {
    E_BADSYNTAX,
    E_FILELIMIT,
    E_NOTFOUND,
-   E_IO
+   E_IO,
+   E_CONV,
+   E_MALLOC
 } errors_l;
+
+enum endianity_l {
+   LSB,
+   MSB
+} endianity_l;
 
 struct file_list_t {
    char name_path[MAX_DIR_STR_LEN];
    char name_short[MAX_DIR_STR_LEN];
-   uint8_t name_short_len;
-   int size;
-   mode_t st_mode;
    struct file_list_t *next;
-   uint16_t parent_id;
+   time_t mtime;
+   int size;
    int dir_id;
    int level;
+   int blocks;
    uint32_t LBA;
+   mode_t st_mode;
+   uint16_t parent_id;
+   uint8_t name_short_len;
 } file_list_t;
 
 struct ISO_data_t {
-   int dir_count;
-   uint32_t boot_cat_LBA;
-   int LBA_last;
    char efi_boot_file[MAX_DIR_STR_LEN];
    char efi_boot_file_full[MAX_DIR_STR_LEN];
    char boot_cat_file[MAX_DIR_STR_LEN];
    char work_dir[MAX_DIR_STR_LEN];
+   char iso_file[MAX_DIR_STR_LEN];
+   int dir_count;
+   int LBA_last;
+   uint32_t boot_cat_LBA;
+   uint32_t path_table_size;
+   uint32_t path_table_offset;
 } ISO_data_t;
 
 void iso9660_cp2heap(void **dest, const void *source, long int size, uint32_t *dest_size);

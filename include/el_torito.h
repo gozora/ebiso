@@ -1,9 +1,9 @@
 /*
  * el_torito.h
  *
- * Version:       0.0.1-alfa
+ * Version:       0.0.2-alfa
  * 
- * Release date:  07.09.2015
+ * Release date:  11.09.2015
  *  
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -26,9 +26,10 @@
  */
 
 #include "globals.h"
+#include <errno.h>
 
-/* iso.c */
+/* ebiso.c */
 void et_boot_record_descr(void **boot_record_descriptor, struct ISO_data_t ISO_data);
-void et_boot_catalog(struct ISO_data_t ISO_data, char *workdir);
+int et_boot_catalog(struct ISO_data_t ISO_data);
 
-static uint16_t et_create_checksum(void *data, uint32_t data_size);
+static uint16_t create_checksum(void *data, uint32_t data_size);

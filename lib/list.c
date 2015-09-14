@@ -1,9 +1,9 @@
 /*
- * fill.c
+ * list.c
  * 
- * Version:       0.0.1-alfa
+ * Version:       0.0.2-alfa
  * 
- * Release date:  07.09.2015
+ * Release date:  08.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -25,58 +25,54 @@
  * 
  */
 
-#include "fill.h"
+#include "list.h"
 #include <dirent.h>
 #include <errno.h>
 
-int fill(const char *dirname, struct file_list_t **flist) {
+int list_create(const char *dirname, struct file_list_t **flist) {
    FILE *read_test = NULL;
    DIR *cur_dir = NULL;
    struct dirent *dir_content = NULL;
-   char path[MAX_DIR_STR_LEN];
-   int path_len = 0;
-   int rc = 0;
    struct stat dir_cont_stat;
+   char path[MAX_DIR_STR_LEN];
+   char tmp_conv[MAX_DIR_STR_LEN];
    static int parent_id = 1;
    static int dir_id = 1;
    static int level = 0;
    int rr_dir = 0;
+   int path_len = 0;
+   int rc = 0;
    
-   level++; // Record/increase current directory level
+   memset(tmp_conv, 0, sizeof(tmp_conv));
    
-   /*
-    * If user provided argument is not a directory, quit
-    */
+   /* Record/increase current directory level */
+   level++;
+   
+   /* Fail if some (sub) directory is unreadable */
    if ( (cur_dir = opendir(dirname)) == NULL ) {
-      printf("Error: Opening directory [%s] failed: %s\n", dirname, strerror(errno));
+      printf("Error: list_create(): Opening directory [%s] failed: %s\n", dirname, strerror(errno));
       rc = E_READFAIL;
       goto cleanup;
    }
    
-   /*
-    * Read whole directory content
-    */
+   /* Read whole directory content */
    while ( (dir_content = readdir(cur_dir)) != NULL && (rc == 0) ) {
       if ( (strcmp(dir_content->d_name, "..") == 0) || (strcmp(dir_content->d_name, ".") == 0) )
          continue;
       
-      /*
-       * Stop if number of characters in path reaches the limit
-       */
+      /* Stop if number of characters in path reaches the limit */
       if ( (path_len = snprintf(path, MAX_DIR_STR_LEN, "%s/%s", dirname, dir_content->d_name)) > MAX_DIR_STR_LEN ) {
-         printf("Error: Max path lenght limit[%d] reached [%s/%s]\n", MAX_DIR_STR_LEN, dirname, dir_content->d_name);
+         printf("Error: list_create(): Max path lenght limit[%d] reached [%s/%s]\n", MAX_DIR_STR_LEN, dirname, dir_content->d_name);
          rc = E_FILELIMIT;
       }
       
-      /*
-       * Fill structure with directory data
-       */
+      /* Fill structure with directory data */
       else {
          strncpy((*flist)->name_path, path, path_len + 1);   // Copy trailing null
          strncpy((*flist)->name_short, dir_content->d_name, MAX_DIR_STR_LEN - 1);
          
          if ((read_test = fopen(path, "r")) == NULL) {
-            printf("Error: Failed to open [%s]: %s\n", path, strerror(errno));
+            printf("Error: list_create(): Failed to open [%s]: %s\n", path, strerror(errno));
             rc = E_READFAIL;
             goto cleanup;
          }
@@ -91,6 +87,7 @@ int fill(const char *dirname, struct file_list_t **flist) {
          (*flist)->name_short_len = strlen((*flist)->name_short);
          (*flist)->size = dir_cont_stat.st_size;
          (*flist)->st_mode = dir_cont_stat.st_mode;
+         (*flist)->mtime = dir_cont_stat.st_mtime;
          (*flist)->dir_id = dir_id;
          (*flist)->next = (struct file_list_t*) malloc(sizeof(struct file_list_t));
          (*flist)->parent_id = parent_id;
@@ -98,16 +95,15 @@ int fill(const char *dirname, struct file_list_t **flist) {
          (*flist) = (*flist)->next;
          
          memset(*flist, 0, sizeof(struct file_list_t));
+         memset(tmp_conv, 0, sizeof(tmp_conv));
       }
       
-      /*
-       * Recursion to child directory
-       */
+      /* Recursion to child directory */
       if ( !(dir_content->d_type ^ DT_DIR) && (rc == 0) ) {
          rr_dir = parent_id;
          parent_id = dir_id;
          
-         rc = fill(path, flist);
+         rc = list_create(path, flist);
          
          parent_id = rr_dir;
       }
@@ -120,4 +116,40 @@ cleanup:
    return rc;
 }
 
+void list_clean(struct file_list_t *list_to_clean) {
+   struct file_list_t *curr = NULL;
+   struct file_list_t *head = NULL;
+   
+   curr = list_to_clean->next;
+
+   while (curr != NULL) {
+      head = curr->next;
+      free(curr);
+      curr = head;
+   }
+   
+   free(list_to_clean);
+}
+
+struct file_list_t *list_search(struct file_list_t *file_list, char *needle) {
+   struct file_list_t *rv = NULL;
+   size_t needle_len = strlen(needle);
+   
+   while(file_list->next != NULL) {
+      if (S_ISDIR(file_list->st_mode)) {
+         file_list = file_list->next;
+         continue;
+      }
+      else {
+         if (strncmp(file_list->name_path, needle, needle_len) == 0) {
+            rv = file_list;
+            break;
+         }
+         else
+            file_list = file_list->next;
+      }
+   }
+   
+   return rv;
+}
 

@@ -1,9 +1,9 @@
 /*
  * ebiso.h
  * 
- * Version:       0.0.1-alfa
+ * Version:       0.0.2-alfa
  * 
- * Release date:  07.09.2015
+ * Release date:  08.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -26,9 +26,14 @@
  */
 
 #include "globals.h"
+#include <time.h>
+#include <dirent.h>
+#include <errno.h>
+#include <unistd.h>
+#include <getopt.h>
 
 #define PROGNAME "ebiso"
-#define VERSION "0.0.2"
+#define VERSION "0.0.2-alfa"
 
 #define DEBUG 1
 #ifdef DEBUG
@@ -51,17 +56,18 @@ enum msg_l {
    MSG_SYNTAX
 } msg_l;
 
-extern int fill(const char *dirname, struct file_list_t **flist);
+extern int list_create(const char *dirname, struct file_list_t **flist);
+extern void list_clean(struct file_list_t *list_to_clean);
 
-extern uint32_t iso9660_header(uint32_t pt_size, void **header, struct file_list_t file_list,int LBA_last);
-extern uint32_t iso9660_path_table(struct file_list_t *file_list, void **path_table);
+extern uint32_t iso9660_header(void **header, struct file_list_t file_list, struct ISO_data_t ISO_data);
 extern uint32_t iso9660_terminator(void **terminator);
-extern int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *LBA_data);
+extern int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum endianity_l endianity, struct ISO_data_t *ISO_data);
+extern int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_data);
 extern int iso9660_directory(struct file_list_t *file_list, FILE *dest);
 
-extern void et_boot_record_descr(void **boot_record_descriptor, struct ISO_data_t LBA_data);
-extern void et_boot_catalog(struct ISO_data_t LBA_data, char *workdir);
+extern void et_boot_record_descr(void **boot_record_descriptor, struct ISO_data_t ISO_data);
+extern int et_boot_catalog(struct ISO_data_t LBA_data);
 
-static void clean_list(struct file_list_t *list_to_clean);
 static int check_availability(char *filename, enum check_type_l type, enum check_mode_l mode);
 static void msg(enum msg_l id);
+static uint32_t get_path_table_offset(struct file_list_t *file_list);
