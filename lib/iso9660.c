@@ -1,9 +1,9 @@
 /*
  * iso9660.c
  * 
- * Version:       0.0.2-alfa
+ * Version:       0.0.3-alfa
  * 
- * Release date:  08.09.2015
+ * Release date:  17.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -168,7 +168,7 @@ int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum en
    
    while(rr_file_list->next != NULL ) {
       if (S_ISDIR(rr_file_list->st_mode)) {
-         pad_len = do_pad(rr_file_list->name_short_len, PAD_ODD);
+         pad_len = do_pad(rr_file_list->name_conv_len, PAD_ODD);
          
          /* Switch endianity for selected parematers */ 
          LBA = rr_file_list->LBA;
@@ -179,7 +179,7 @@ int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum en
          }
          
          /* Dynamic memory allocation BEGIN */
-         entry_len = 8 + rr_file_list->name_short_len + pad_len;
+         entry_len = PT_RECORD_LEN + rr_file_list->name_conv_len + pad_len;
          mem_free -= entry_len;
          if (mem_free < 0) {
             count++;
@@ -198,11 +198,11 @@ int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum en
          }
          /* Dynamic memory allocation END */
          
-         iso9660_cp2heap(&rr_path_table, &rr_file_list->name_short_len, sizeof(uint8_t), &path_table_size);                     // Len of dir name
+         iso9660_cp2heap(&rr_path_table, &rr_file_list->name_conv_len, sizeof(uint8_t), &path_table_size);                      // Len of dir name
          iso9660_cp2heap(&rr_path_table, &zero, sizeof(uint8_t), &path_table_size);                                             // Extended attr record
          iso9660_cp2heap(&rr_path_table, &LBA, sizeof(uint32_t), &path_table_size);                                             // LBA
          iso9660_cp2heap(&rr_path_table, &parent_id, sizeof(uint16_t), &path_table_size);                                       // Parent dir ID
-         iso9660_cp2heap(&rr_path_table, rr_file_list->name_short, rr_file_list->name_short_len + pad_len, &path_table_size);   // Dir name
+         iso9660_cp2heap(&rr_path_table, rr_file_list->name_conv, rr_file_list->name_conv_len + pad_len, &path_table_size);     // Dir name
       }
       
       rr_file_list = rr_file_list->next;
@@ -288,7 +288,7 @@ int iso9660_directory(struct file_list_t *file_list, FILE *dest) {
    int entry_len = 0;
    int bytes_written = 0;
    uint8_t file_terminator_len = 0;
-   uint8_t pad = 0;
+   uint8_t pad_len = 0;
    
    while(rr_file_list->next != NULL) {
       /* Skip files */
@@ -317,17 +317,14 @@ int iso9660_directory(struct file_list_t *file_list, FILE *dest) {
          if (tmp_file_list->parent_id == rr_file_list->dir_id && *tmp_file_list->name_short != 0 ) {
             
             /* Dynamic memory allocataion block BEGIN */
-            if ( (tmp_file_list->name_short_len % 2) == 0)
-               pad = 1;
-            else
-               pad = 0;
+            pad_len = do_pad(tmp_file_list->name_conv_len, PAD_EVEN);
             
             if (S_ISDIR(tmp_file_list->st_mode))
                file_terminator_len = 0;
             else
                file_terminator_len = 2;
             
-            entry_len = DIR_RECORD_LEN + tmp_file_list->name_short_len + pad + file_terminator_len;
+            entry_len = DIR_RECORD_LEN + tmp_file_list->name_conv_len + pad_len + file_terminator_len;
             
             if (bytes_written + entry_len > count * BLOCK_SIZE) {
                count++;
@@ -337,7 +334,7 @@ int iso9660_directory(struct file_list_t *file_list, FILE *dest) {
                   
                   /* 
                    * Directory table can't cross block borders.
-                   * Dont mess up with couple of free bytes and move pointer to new block
+                   * Dont mess up with couple of free spare bytes and move pointer to new block
                    */
                   directory_table = directory_table_start + (count * BLOCK_SIZE) - BLOCK_SIZE;
                   bytes_written = (count - 1) * BLOCK_SIZE;
@@ -375,6 +372,15 @@ cleanup:
    return rv;
 }
 
+uint8_t do_pad(uint8_t len, enum pad_list_t type) {
+   uint8_t pad_len = 0;
+   
+   if ((type == PAD_EVEN && len % 2 == 0) || (type == PAD_ODD && len % 2 != 0))
+      pad_len = 1;
+   
+   return pad_len;
+}
+
 static uint32_t construct_dir_segment(struct file_list_t *file_list, void **directory_table_output, enum segment_list_t type) {
    struct file_list_t *rr_file_list = file_list;
    struct tm *ts = NULL;
@@ -408,7 +414,7 @@ static uint32_t construct_dir_segment(struct file_list_t *file_list, void **dire
    
    LBA = get_int32_LSB_MSB(rr_file_list->LBA);
    
-   pad_len = do_pad(rr_file_list->name_short_len, PAD_EVEN);
+   pad_len = do_pad(rr_file_list->name_conv_len, PAD_EVEN);
    
    if (S_ISDIR(rr_file_list->st_mode)) {
       flags = 0x02;
@@ -427,8 +433,8 @@ static uint32_t construct_dir_segment(struct file_list_t *file_list, void **dire
       pad_len = 0;
    }
    else {
-      length_dir_record = DIR_RECORD_LEN + rr_file_list->name_short_len + file_terminator_len + pad_len;
-      name_len = rr_file_list->name_short_len + file_terminator_len;
+      length_dir_record = DIR_RECORD_LEN + rr_file_list->name_conv_len + file_terminator_len + pad_len;
+      name_len = rr_file_list->name_conv_len + file_terminator_len;
    }
    
    iso9660_cp2heap(&rr_directory_table, &length_dir_record, sizeof(uint8_t), &directory_table_size);  // Lenght of whole entry
@@ -446,7 +452,7 @@ static uint32_t construct_dir_segment(struct file_list_t *file_list, void **dire
    if (type == ROOT || type == ROOT_HEADER)
       iso9660_cp2heap(&rr_directory_table, &zero, name_len, &directory_table_size);
    else
-      iso9660_cp2heap(&rr_directory_table, rr_file_list->name_short, rr_file_list->name_short_len, &directory_table_size);
+      iso9660_cp2heap(&rr_directory_table, rr_file_list->name_conv, rr_file_list->name_conv_len, &directory_table_size);
 
    /* If entry is file, add file terminator */
    if (!S_ISDIR(rr_file_list->st_mode))
@@ -554,13 +560,4 @@ static void str_var_prepare(char *input, char fill_char, size_t input_size) {
    
    input += input_len;
    memset(input, fill_char, input_size - input_len);
-}
-
-static uint8_t do_pad(uint8_t len, enum pad_list_t type) {
-   uint8_t pad_len = 0;
-   
-   if ((type == PAD_EVEN && len % 2 == 0) || (type == PAD_ODD && len % 2 != 0))
-      pad_len = 1;
-   
-   return pad_len;
 }

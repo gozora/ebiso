@@ -5,12 +5,12 @@ LLIBDIR=lib
 INCLUDEDIR=./include
 INCLUDE=-I${INCLUDEDIR}
 MAIN_LIB=${LLIBDIR}/libmain.a
-LIB=-L${LLIBDIR} -lmain
+LIB=-L${LLIBDIR} -lmain -lm
 INSTDIR=/usr/local/bin
 PROGNAME=ebiso
 
-DEPS=${LLIBDIR}/list.o ${LLIBDIR}/iso9660.o ${LLIBDIR}/write_files.o ${LLIBDIR}/el_torito.o
-HEADERS=${INCLUDEDIR}/list.h ${INCLUDEDIR}/iso9660.h ${INCLUDEDIR}/write_files.h ${INCLUDEDIR}/el_torito.h ${INCLUDEDIR}/globals.h
+DEPS=${LLIBDIR}/list.o ${LLIBDIR}/iso9660.o ${LLIBDIR}/write_files.o ${LLIBDIR}/el_torito.o ${LLIBDIR}/filename.o
+HEADERS=${INCLUDEDIR}/list.h ${INCLUDEDIR}/iso9660.h ${INCLUDEDIR}/write_files.h ${INCLUDEDIR}/el_torito.h ${INCLUDEDIR}/globals.h ${INCLUDEDIR}/filename.h
 
 all: ${MAIN_LIB} iso 
 

@@ -1,10 +1,10 @@
 /*
- * el_torito.h
- *
- * Version:       0.0.3-alfa
+ * filename.c
+ * 
+ * Version:       0.0.1-alfa
  * 
  * Release date:  17.09.2015
- *  
+ * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -26,12 +26,13 @@
  */
 
 #include "globals.h"
-#include <errno.h>
+#include <math.h>
 
-extern void iso9660_cp2heap(void **dest, const void *source, long int size, uint32_t *dest_size);
-
+/* list.c */
+uint8_t convert_name(char *input, char *output, enum conv_type_l type);
 /* ebiso.c */
-void et_boot_record_descr(void **boot_record_descriptor, struct ISO_data_t ISO_data);
-int et_boot_catalog(struct ISO_data_t ISO_data);
+void filename_rename_duplicates(struct file_list_t *list);
 
-static uint16_t create_checksum(void *data, uint32_t data_size);
+static void filename_explode(char *input, char **oname, char **oext, enum conv_type_l type);
+static size_t conv_rules(char *input, int max_len);
+static char *add_duplicate_couter(char *input, int counter, uint8_t *input_len);

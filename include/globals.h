@@ -1,9 +1,9 @@
 /*
  * globals.h
  * 
- * Version:       0.0.2-alfa
+ * Version:       0.0.3-alfa
  * 
- * Release date:  08.09.2015
+ * Release date:  17.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -39,6 +39,7 @@
 #define SYSTEM_ID "LINUX"
 #define VOLUME_ID "CDROM"
 #define DIR_RECORD_LEN 0x21
+#define PT_RECORD_LEN 0x8
 
 static const uint8_t zero = 0;
 static const uint8_t one = 1;
@@ -63,9 +64,19 @@ enum endianity_l {
    MSB
 } endianity_l;
 
+enum conv_type_l {
+   CONV_ISO9660
+};
+
+enum pad_list_t {
+   PAD_EVEN,
+   PAD_ODD
+} pad_list_t;
+
 struct file_list_t {
    char name_path[MAX_DIR_STR_LEN];
    char name_short[MAX_DIR_STR_LEN];
+   char name_conv[MAX_DIR_STR_LEN];
    struct file_list_t *next;
    time_t mtime;
    int size;
@@ -75,6 +86,7 @@ struct file_list_t {
    uint32_t LBA;
    mode_t st_mode;
    uint16_t parent_id;
+   uint8_t name_conv_len;
    uint8_t name_short_len;
 } file_list_t;
 
@@ -90,5 +102,3 @@ struct ISO_data_t {
    uint32_t path_table_size;
    uint32_t path_table_offset;
 } ISO_data_t;
-
-void iso9660_cp2heap(void **dest, const void *source, long int size, uint32_t *dest_size);

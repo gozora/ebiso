@@ -1,9 +1,9 @@
 /*
  * list.c
  * 
- * Version:       0.0.2-alfa
+ * Version:       0.0.3-alfa
  * 
- * Release date:  08.09.2015
+ * Release date:  17.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -70,6 +70,9 @@ int list_create(const char *dirname, struct file_list_t **flist) {
       else {
          strncpy((*flist)->name_path, path, path_len + 1);   // Copy trailing null
          strncpy((*flist)->name_short, dir_content->d_name, MAX_DIR_STR_LEN - 1);
+         
+         /* convert filename to 8.3 format */
+         (*flist)->name_conv_len = convert_name((*flist)->name_short, (*flist)->name_conv, CONV_ISO9660);
          
          if ((read_test = fopen(path, "r")) == NULL) {
             printf("Error: list_create(): Failed to open [%s]: %s\n", path, strerror(errno));

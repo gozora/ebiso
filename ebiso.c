@@ -1,9 +1,9 @@
 /*
  * ebiso.c
  * 
- * Version:       0.0.2-alfa
+ * Version:       0.0.3-alfa
  * 
- * Release date:  07.09.2015
+ * Release date:  17.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
     */
    strncpy(list->name_path, ".", 1);
    list->name_short_len = 1;
+   list->name_conv_len = 1;
    list->size = 4096;
    list->st_mode = 16877;
    list->mtime = time(NULL);
@@ -163,6 +164,9 @@ int main(int argc, char *argv[]) {
    /* Create initial file structure */
    if ((rv = list_create(ISO_data.work_dir, &rr_list)) != E_OK)
       goto cleanup;
+   
+   /* Remove possible duplicates */
+   filename_rename_duplicates(list);
    
    /* Calculate path table offset, so LBAs can be offsetted in future */
    ISO_data.path_table_offset = get_path_table_offset(list);
@@ -326,18 +330,14 @@ Arguments:\n\
 }
 
 static uint32_t get_path_table_offset(struct file_list_t *file_list) {
-   int pad_len = 0;
+   uint8_t pad_len = 0;
    uint32_t path_table_size = 0;
    
    while(file_list->next != NULL ) {
       if (S_ISDIR(file_list->st_mode)) {
-         if (file_list->name_short_len % 2 != 0)
-            pad_len = 1;
-         else
-            pad_len = 0;
+         pad_len = do_pad(file_list->name_conv_len, PAD_ODD);
          
-         
-         path_table_size += 8 + file_list->name_short_len + pad_len;
+         path_table_size += PT_RECORD_LEN + file_list->name_short_len + pad_len;
       }
       
       file_list = file_list->next;

@@ -1,9 +1,9 @@
 /*
  * ebiso.h
  * 
- * Version:       0.0.2-alfa
+ * Version:       0.0.3-alfa
  * 
- * Release date:  08.09.2015
+ * Release date:  17.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -33,9 +33,9 @@
 #include <getopt.h>
 
 #define PROGNAME "ebiso"
-#define VERSION "0.0.2-alfa"
+#define VERSION "0.0.3-alfa"
 
-#define DEBUG 1
+//#define DEBUG 1
 #ifdef DEBUG
 static void disp_level(struct file_list_t *list_to_display, int level);
 #endif
@@ -56,6 +56,8 @@ enum msg_l {
    MSG_SYNTAX
 } msg_l;
 
+extern void filename_rename_duplicates(struct file_list_t *list);
+
 extern int list_create(const char *dirname, struct file_list_t **flist);
 extern void list_clean(struct file_list_t *list_to_clean);
 
@@ -64,6 +66,7 @@ extern uint32_t iso9660_terminator(void **terminator);
 extern int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum endianity_l endianity, struct ISO_data_t *ISO_data);
 extern int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_data);
 extern int iso9660_directory(struct file_list_t *file_list, FILE *dest);
+extern uint8_t do_pad(uint8_t len, enum pad_list_t type);
 
 extern void et_boot_record_descr(void **boot_record_descriptor, struct ISO_data_t ISO_data);
 extern int et_boot_catalog(struct ISO_data_t LBA_data);

@@ -1,9 +1,9 @@
 /*
  * iso9660.h
  * 
- * Version:       0.0.2-alfa
+ * Version:       0.0.3-alfa
  * 
- * Release date:  08.09.2015
+ * Release date:  17.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -28,11 +28,6 @@
 #include "globals.h"
 #include <time.h>
 
-enum pad_list_t {
-   PAD_EVEN,
-   PAD_ODD
-} pad_list_t;
-
 enum segment_list_t {
    ROOT,
    ROOT_HEADER,
@@ -48,6 +43,10 @@ uint32_t iso9660_header(void **header, struct file_list_t file_list, struct ISO_
 int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum endianity_l endianity, struct ISO_data_t *ISO_data);
 int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_data);
 int iso9660_directory(struct file_list_t *file_list, FILE *dest);
+uint8_t do_pad(uint8_t len, enum pad_list_t type);
+
+/* el_torito.c */
+void iso9660_cp2heap(void **dest, const void *source, long int size, uint32_t *dest_size);
 
 static uint32_t construct_dir_segment(struct file_list_t *file_list, void **directory_table_output, enum segment_list_t type);
 static uint64_t get_int32_LSB_MSB(uint64_t input);
@@ -56,4 +55,3 @@ static int blocks_count(int size);
 static int int2str(uint16_t input, char **output);
 static int format_header_date(time_t time_now, char *output);
 static void str_var_prepare(char *input, char fill_char, size_t input_size);
-static uint8_t do_pad(uint8_t len, enum pad_list_t type);
