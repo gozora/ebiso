@@ -1,9 +1,9 @@
 /*
  * ebiso.c
  * 
- * Version:       0.0.3-alfa
+ * Version:       0.1.0
  * 
- * Release date:  17.09.2015
+ * Release date:  20.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -41,6 +41,7 @@ int main(int argc, char *argv[]) {
    int option = 0;
    int e_flag = 0;
    int o_flag = 0;
+   int R_flag = 0;
    int rv = 0;
    
    memset(list, 0, sizeof(struct file_list_t));
@@ -70,7 +71,7 @@ int main(int argc, char *argv[]) {
       {0, 0, 0, 0}
    };
    
-   while ((option = getopt_long(argc, argv, "e:ho:v", longOptions, NULL)) != -1) {
+   while ((option = getopt_long(argc, argv, "e:ho:Rv", longOptions, NULL)) != -1) {
       switch(option) {
          case 'h':
             msg(MSG_USAGE);
@@ -104,6 +105,10 @@ int main(int argc, char *argv[]) {
                o_flag++;
             }
          break;
+         case 'R':
+            /* Just a placeholder RRIP is not yet implemented */
+            R_flag++;
+         break;
          default:
             rv = E_BADSYNTAX;
             goto cleanup;
@@ -115,7 +120,7 @@ int main(int argc, char *argv[]) {
     * First syntax check
     * I dont line argc != 6 this will be chnaged later ;-)
     */
-   if (e_flag != 1 || o_flag != 1 || argc != 6) {
+   if (e_flag != 1 || o_flag != 1 || R_flag > 1 || argc < 6) {
       msg(MSG_SYNTAX);
       rv = E_BADSYNTAX;
       goto cleanup;
@@ -218,7 +223,7 @@ int main(int argc, char *argv[]) {
    int i = 0;
    switch (DEBUG) {
       case 1:
-         printf("%-5s %-4s %-50s %-11s %-3s %-7s %-5s %-7s %-30s\n", "Level", "PID", "Name", "Size", "ID", "LBA", "Flag", "Blocks", "Date");
+         printf("%-5s %-4s %-50s %-11s %-3s %-7s %-5s %-7s %-12s %-5s %-30s\n", "Level", "PID", "Name", "Size", "ID", "LBA", "Flag", "Blocks", "Write name", "Len", "Date");
          for (i = 0; i <= 8; i++)
             disp_level(list, i);
       break;
@@ -253,8 +258,8 @@ static void disp_level(struct file_list_t *list_to_display, int level) {
          ts = localtime(&list_to_display->mtime);
          strftime(buff, sizeof(buff), "%a %Y-%m-%d %H:%M:%S %Z", ts);
          
-         printf("%-5d %-4d %-50s %-11d %-3d %-7d %-5c %-7d %-30s\n", level, list_to_display->parent_id, list_to_display->name_path, list_to_display->size, \
-         list_to_display->dir_id, list_to_display->LBA, flag, list_to_display->blocks, buff);
+         printf("%-5d %-4d %-50s %-11d %-3d %-7d %-5c %-7d %-12s %-5d %-30s\n", level, list_to_display->parent_id, list_to_display->name_path, list_to_display->size, \
+         list_to_display->dir_id, list_to_display->LBA, flag, list_to_display->blocks, list_to_display->name_conv, list_to_display->name_conv_len, buff);
       }
       
       list_to_display = list_to_display->next;

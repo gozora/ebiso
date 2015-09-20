@@ -27,44 +27,6 @@
 
 #include "filename.h"
 
-//int main() {
-   //struct file_list_t *list = (struct file_list_t*) malloc(sizeof(struct file_list_t));
-   //struct file_list_t *list_start = list;
-   
-   //int filename_len = -40;
-   //int conv_len = -40;
-   //int level_len = -7;
-   
-   //memset(list, 0, sizeof(struct file_list_t));
-
-   ///* Convert data to 8.3 filename format */
-   //list = list_start;
-   //while(list->next != NULL) {
-      //convert_name(list->name_short, list->name_conv, CONV_ISO9660);
-      
-      //list = list->next;
-   //}
-   
-   ///* Add counter string, if any duplicates are found */
-   //printf("Searching for duplicates ...\n");
-   //list = list_start;
-   //rename_duplicates(list);
-   
-   ///* Display data */
-   //printf("\n%*s %*s %*s\n", filename_len, "Filename", conv_len, "Conv name", level_len, "Level");
-   //list = list_start;
-   //while(list->next != NULL) {
-      //printf("%*s %*s %*d\n", filename_len, list->name_short, conv_len, list->name_conv, level_len, list->level);
-      
-      //list = list->next;
-   //}
-      
-   ///* Cleanup part */
-   //list_clean(list_start);
-   
-   //return 0;
-//}
-
 void filename_rename_duplicates(struct file_list_t *list) {
    struct file_list_t *rr_list = list;
    struct file_list_t *rr2_list = list;

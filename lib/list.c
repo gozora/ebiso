@@ -71,8 +71,15 @@ int list_create(const char *dirname, struct file_list_t **flist) {
          strncpy((*flist)->name_path, path, path_len + 1);   // Copy trailing null
          strncpy((*flist)->name_short, dir_content->d_name, MAX_DIR_STR_LEN - 1);
          
+         /*
+          * Temporary disabled, until implementation of RRIP is finished
+          * Medium is currently not fully ISO compatible, but should be working anyhow
+          */
          /* convert filename to 8.3 format */
-         (*flist)->name_conv_len = convert_name((*flist)->name_short, (*flist)->name_conv, CONV_ISO9660);
+         //(*flist)->name_conv_len = convert_name((*flist)->name_short, (*flist)->name_conv, CONV_ISO9660);
+         (*flist)->name_conv_len = strlen((*flist)->name_short);
+         strncpy((*flist)->name_conv, (*flist)->name_short, (*flist)->name_conv_len);
+         
          
          if ((read_test = fopen(path, "r")) == NULL) {
             printf("Error: list_create(): Failed to open [%s]: %s\n", path, strerror(errno));
