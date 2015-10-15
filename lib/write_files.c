@@ -1,9 +1,9 @@
 /*
  * write_files.c
  * 
- * Version:       0.0.2-alfa
+ * Version:       0.0.3
  * 
- * Release date:  07.09.2015
+ * Release date:  10.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 

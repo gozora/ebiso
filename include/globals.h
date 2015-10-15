@@ -32,6 +32,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+//#define DEBUG 1
+
 #define MAX_DIR_STR_LEN 512
 #define BLOCK_SIZE 2048
 #define LBA_ROOT 0x18
@@ -40,6 +42,9 @@
 #define VOLUME_ID "CDROM"
 #define DIR_RECORD_LEN 0x21
 #define PT_RECORD_LEN 0x8
+#define ARR_PREALLOC 20
+#define RRIP_INIT_FIELDS rrip_RR | rrip_PX | rrip_TF | rrip_NM
+//#define RRIP_INIT_FIELDS rrip_RR | rrip_PX | rrip_TF
 
 static const uint8_t zero = 0;
 static const uint8_t one = 1;
@@ -56,7 +61,8 @@ enum errors_l {
    E_NOTFOUND,
    E_IO,
    E_CONV,
-   E_MALLOC
+   E_MALLOC,
+   E_NOTSET
 } errors_l;
 
 enum endianity_l {
@@ -73,19 +79,48 @@ enum pad_list_t {
    PAD_ODD
 } pad_list_t;
 
+enum opt_l {
+   OPT_e = 1,
+   OPT_o,
+   OPT_R
+};
+
+typedef enum bool_t {
+   FALSE,
+   TRUE
+} bool_t;
+
+struct CE_list_t {
+   unsigned int *pid;
+   unsigned int *lba;
+   size_t members;
+   size_t arr_size;
+   const int arr_prealloc;
+} CE_list_t;
+
 struct file_list_t {
    char name_path[MAX_DIR_STR_LEN];
    char name_short[MAX_DIR_STR_LEN];
    char name_conv[MAX_DIR_STR_LEN];
    struct file_list_t *next;
    time_t mtime;
+   time_t atime;
+   time_t ctime;
+   mode_t st_mode;
+   nlink_t st_nlink;
+   uid_t st_uid;
+   gid_t st_gid;
+   ino_t st_ino;
    int size;
    int dir_id;
    int level;
    int blocks;
+   int CE_len;
+   int CE_offset;
    uint32_t LBA;
-   mode_t st_mode;
+   uint32_t CE_LBA;
    uint16_t parent_id;
+   uint8_t ISO9660_len;
    uint8_t name_conv_len;
    uint8_t name_short_len;
 } file_list_t;
@@ -98,7 +133,9 @@ struct ISO_data_t {
    char iso_file[MAX_DIR_STR_LEN];
    int dir_count;
    int LBA_last;
+   int largest_cont_block;
    uint32_t boot_cat_LBA;
    uint32_t path_table_size;
    uint32_t path_table_offset;
+   uint32_t options;
 } ISO_data_t;

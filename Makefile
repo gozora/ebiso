@@ -1,36 +1,59 @@
+# add .h files to dependencies: http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/#combine
+# FLAGS=-g3 -O3 -m64 -std=gnu9x -Wall -Wshadow -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes
+# $(info $$OBJ is [${OBJ}])
+
 CC=gcc
-#OPTS=-g3 -O3 -m64 -std=gnu9x -Wall -Wshadow -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes
-OPTS=-g3 -m64 -std=gnu9x -Wall -Wshadow -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes
-LLIBDIR=lib
+LIBDIR=lib
 INCLUDEDIR=./include
-INCLUDE=-I${INCLUDEDIR}
-MAIN_LIB=${LLIBDIR}/libmain.a
-LIB=-L${LLIBDIR} -lmain -lm
 INSTDIR=/usr/local/bin
 PROGNAME=ebiso
 
-DEPS=${LLIBDIR}/list.o ${LLIBDIR}/iso9660.o ${LLIBDIR}/write_files.o ${LLIBDIR}/el_torito.o ${LLIBDIR}/filename.o
-HEADERS=${INCLUDEDIR}/list.h ${INCLUDEDIR}/iso9660.h ${INCLUDEDIR}/write_files.h ${INCLUDEDIR}/el_torito.h ${INCLUDEDIR}/globals.h ${INCLUDEDIR}/filename.h
+BASE_DEPDIR=.d
+DEPDIR=.d/${LIBDIR}
+$(shell mkdir -p $(DEPDIR) >/dev/null)
+DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
+POSTCOMPILE=mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d
 
-all: ${MAIN_LIB} iso 
+LIBS=-L${LIBDIR} -lmain -lm
+MAIN_LIB=${LIBDIR}/libmain.a
 
-${LLIBDIR}/%.o: ${LLIBDIR}/%.c
-	${CC} ${OPTS} ${INCLUDE} -c -o $@ $^
+FLAGS=-g3 -m64 -std=gnu9x -Wall -Wshadow -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -I${INCLUDEDIR}
+VERSION=$(shell grep "\#define VERSION" ${INCLUDEDIR}/${PROGNAME}.h | awk '{ print $$NF }' | sed s/\"//g)
 
-${MAIN_LIB}: ${DEPS} ${HEADERS}
-	ar rcs $@ ${DEPS}
+SRC=$(wildcard ${LIBDIR}/*.c)
+HEADERS=$(wildcard ${INCLUDEDIR}/*.h)
+OBJ=$(addprefix ${LIBDIR}/,$(notdir $(SRC:.c=.o)))
 
-iso: ${DEPS} ${PROGNAME}.c ${INCLUDEDIR}/${PROGNAME}.h
-	${CC} ${OPTS} ${INCLUDE} -o ${PROGNAME} ${PROGNAME}.c ${LIB}
+all: ${MAIN_LIB} ${PROGNAME}
+
+${LIBDIR}/%.o: ${LIBDIR}/%.c $(DEPDIR)/%.d
+	${CC} ${FLAGS} ${DEPFLAGS} -c -o $@ $<
+	$(POSTCOMPILE)
+
+$(DEPDIR)/%.d: ;
+
+${MAIN_LIB}: ${OBJ} ${HEADERS}
+	ar rcs $@ ${OBJ}
+
+${PROGNAME}: ${OBJ} ${PROGNAME}.c ${HEADERS}
+	${CC} ${FLAGS} -o ${PROGNAME} ${PROGNAME}.c ${LIBS}
+
+.PHONY: dist
+dist:
+	make clean
+	tar czf ../$(PROGNAME)-$(VERSION).tgz --transform='s,^${PROGNAME},$(PROGNAME)-$(VERSION),S' \
+	--exclude=.git \
+	--exclude=.gitignore \
+	--exclude=README.md \
+	-C .. ${PROGNAME}
+	@mv ../$(PROGNAME)-$(VERSION).tgz ./
 
 .PHONY: clean
 clean:
-	rm -rf ${LLIBDIR}/*.o ${LLIBDIR}/*.a
-	rm -rf ${PROGNAME}
-
-.PHONY: oclean
-oclean:
-	rm -rf ${LLIBDIR}/*.o
+	rm -f ${LIBDIR}/*.o ${LIBDIR}/*.a
+	rm -f ${PROGNAME}
+	rm -f $(PROGNAME)*.tgz
+	rm -rf ${BASE_DEPDIR}
 
 .PHONY: install
 install: ${PROGNAME}
@@ -39,3 +62,5 @@ install: ${PROGNAME}
 .PHONY: uninstall
 uninstall:
 	-rm ${INSTDIR}/${PROGNAME}
+
+-include $(patsubst %,$(BASE_DEPDIR)/%.d,$(basename $(SRC)))

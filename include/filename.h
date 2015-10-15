@@ -1,9 +1,9 @@
 /*
  * filename.c
  * 
- * Version:       0.0.1-alfa
+ * Version:       0.1.1
  * 
- * Release date:  17.09.2015
+ * Release date:  20.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -29,7 +29,7 @@
 #include <math.h>
 
 /* list.c */
-uint8_t convert_name(char *input, char *output, enum conv_type_l type);
+uint8_t filename_convert_name(char *input, char *output, enum conv_type_l type);
 /* ebiso.c */
 void filename_rename_duplicates(struct file_list_t *list);
 

@@ -1,9 +1,9 @@
 /*
  * list.c
  * 
- * Version:       0.0.3-alfa
+ * Version:       0.1.1
  * 
- * Release date:  17.09.2015
+ * Release date:  20.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -41,7 +41,7 @@ int list_create(const char *dirname, struct file_list_t **flist) {
    static int level = 0;
    int rr_dir = 0;
    int path_len = 0;
-   int rc = 0;
+   int rv = 0;
    
    memset(tmp_conv, 0, sizeof(tmp_conv));
    
@@ -51,19 +51,19 @@ int list_create(const char *dirname, struct file_list_t **flist) {
    /* Fail if some (sub) directory is unreadable */
    if ( (cur_dir = opendir(dirname)) == NULL ) {
       printf("Error: list_create(): Opening directory [%s] failed: %s\n", dirname, strerror(errno));
-      rc = E_READFAIL;
+      rv = E_READFAIL;
       goto cleanup;
    }
    
    /* Read whole directory content */
-   while ( (dir_content = readdir(cur_dir)) != NULL && (rc == 0) ) {
+   while ( (dir_content = readdir(cur_dir)) != NULL && (rv == 0) ) {
       if ( (strcmp(dir_content->d_name, "..") == 0) || (strcmp(dir_content->d_name, ".") == 0) )
          continue;
       
       /* Stop if number of characters in path reaches the limit */
       if ( (path_len = snprintf(path, MAX_DIR_STR_LEN, "%s/%s", dirname, dir_content->d_name)) > MAX_DIR_STR_LEN ) {
          printf("Error: list_create(): Max path lenght limit[%d] reached [%s/%s]\n", MAX_DIR_STR_LEN, dirname, dir_content->d_name);
-         rc = E_FILELIMIT;
+         rv = E_FILELIMIT;
       }
       
       /* Fill structure with directory data */
@@ -71,19 +71,12 @@ int list_create(const char *dirname, struct file_list_t **flist) {
          strncpy((*flist)->name_path, path, path_len + 1);   // Copy trailing null
          strncpy((*flist)->name_short, dir_content->d_name, MAX_DIR_STR_LEN - 1);
          
-         /*
-          * Temporary disabled, until implementation of RRIP is finished
-          * Medium is currently not fully ISO compatible, but should be working anyhow
-          */
          /* convert filename to 8.3 format */
-         //(*flist)->name_conv_len = convert_name((*flist)->name_short, (*flist)->name_conv, CONV_ISO9660);
-         (*flist)->name_conv_len = strlen((*flist)->name_short);
-         strncpy((*flist)->name_conv, (*flist)->name_short, (*flist)->name_conv_len);
-         
+         (*flist)->name_conv_len = filename_convert_name((*flist)->name_short, (*flist)->name_conv, CONV_ISO9660);
          
          if ((read_test = fopen(path, "r")) == NULL) {
             printf("Error: list_create(): Failed to open [%s]: %s\n", path, strerror(errno));
-            rc = E_READFAIL;
+            rv = E_READFAIL;
             goto cleanup;
          }
          else
@@ -97,7 +90,13 @@ int list_create(const char *dirname, struct file_list_t **flist) {
          (*flist)->name_short_len = strlen((*flist)->name_short);
          (*flist)->size = dir_cont_stat.st_size;
          (*flist)->st_mode = dir_cont_stat.st_mode;
+         (*flist)->st_nlink = dir_cont_stat.st_nlink;
+         (*flist)->st_uid = dir_cont_stat.st_uid;
+         (*flist)->st_gid = dir_cont_stat.st_gid;
+         (*flist)->st_ino = dir_cont_stat.st_ino;
          (*flist)->mtime = dir_cont_stat.st_mtime;
+         (*flist)->atime = dir_cont_stat.st_atime;
+         (*flist)->ctime = dir_cont_stat.st_ctime;
          (*flist)->dir_id = dir_id;
          (*flist)->next = (struct file_list_t*) malloc(sizeof(struct file_list_t));
          (*flist)->parent_id = parent_id;
@@ -109,11 +108,11 @@ int list_create(const char *dirname, struct file_list_t **flist) {
       }
       
       /* Recursion to child directory */
-      if ( !(dir_content->d_type ^ DT_DIR) && (rc == 0) ) {
+      if ( !(dir_content->d_type ^ DT_DIR) && (rv == 0) ) {
          rr_dir = parent_id;
          parent_id = dir_id;
          
-         rc = list_create(path, flist);
+         rv = list_create(path, flist);
          
          parent_id = rr_dir;
       }
@@ -123,7 +122,7 @@ cleanup:
    closedir(cur_dir);
    level--;
    
-   return rc;
+   return rv;
 }
 
 void list_clean(struct file_list_t *list_to_clean) {

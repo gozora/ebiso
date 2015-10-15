@@ -1,9 +1,9 @@
 /*
  * list.h
  * 
- * Version:       0.0.3-alfa
+ * Version:       0.1.1
  * 
- * Release date:  17.09.2015
+ * Release date:  20.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -27,7 +27,7 @@
 
 #include "globals.h"
 
-extern uint8_t convert_name(char *input, char *output, enum conv_type_l type);
+extern uint8_t filename_convert_name(char *input, char *output, enum conv_type_l type);
 
 /* ebiso.c */
 int list_create(const char *dirname, struct file_list_t **flist);

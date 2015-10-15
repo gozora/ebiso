@@ -1,7 +1,7 @@
 /*
  * ebiso.h
  * 
- * Version:       0.1.0
+ * Version:       0.1.1
  * 
  * Release date:  20.09.2015
  * 
@@ -33,9 +33,8 @@
 #include <getopt.h>
 
 #define PROGNAME "ebiso"
-#define VERSION "0.1.0"
+#define VERSION "0.1.1"
 
-#define DEBUG 1
 #ifdef DEBUG
 static void disp_level(struct file_list_t *list_to_display, int level);
 #endif
@@ -65,12 +64,17 @@ extern uint32_t iso9660_header(void **header, struct file_list_t file_list, stru
 extern uint32_t iso9660_terminator(void **terminator);
 extern int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum endianity_l endianity, struct ISO_data_t *ISO_data);
 extern int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_data);
-extern int iso9660_directory(struct file_list_t *file_list, FILE *dest);
+extern int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct ISO_data_t *ISO_data);
 extern uint8_t do_pad(uint8_t len, enum pad_list_t type);
 
 extern void et_boot_record_descr(void **boot_record_descriptor, struct ISO_data_t ISO_data);
 extern int et_boot_catalog(struct ISO_data_t LBA_data);
 
+/* iso9660.c */
+int option_on_off(uint32_t option2check, enum opt_l option);
+
+static int set_option(uint32_t *opt2set, enum opt_l option);
 static int check_availability(char *filename, enum check_type_l type, enum check_mode_l mode);
-static void msg(enum msg_l id);
+static void help_msg(enum msg_l id);
+static void err_msg(enum errors_l error);
 static uint32_t get_path_table_offset(struct file_list_t *file_list);

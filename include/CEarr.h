@@ -1,9 +1,9 @@
 /*
- * write_files.h
+ * CEarr.h
  * 
- * Version:       0.0.3
+ * Version:       0.0.1
  * 
- * Release date:  10.10.2015
+ * Release date:  09.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -26,5 +26,13 @@
  */
 
 #include "globals.h"
+#include <time.h>
+#include <search.h>
 
-int write_files(struct file_list_t *file_list, FILE *dest);
+/* iso9660.c */
+int CEarr_reccord_num(struct CE_list_t *CE_list, struct file_list_t *file_list, uint32_t *LBA);
+int CEarr_init_list(struct CE_list_t *CE_list, int arr_prealloc);
+void CEarr_destroy_list(struct CE_list_t *CE_list);
+
+static int malloc_CE_list(struct CE_list_t *CE_list);
+static int compar(const void *a, const void *b);

@@ -1,9 +1,9 @@
 /*
- * write_files.h
+ * rockridge.h
  * 
- * Version:       0.0.3
+ * Version:       0.1.0
  * 
- * Release date:  10.10.2015
+ * Release date:  20.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -27,4 +27,3 @@
 
 #include "globals.h"
 
-int write_files(struct file_list_t *file_list, FILE *dest);

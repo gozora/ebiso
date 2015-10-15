@@ -1,7 +1,7 @@
 /*
  * ebiso.c
  * 
- * Version:       0.1.0
+ * Version:       0.1.1
  * 
  * Release date:  20.09.2015
  * 
@@ -41,7 +41,6 @@ int main(int argc, char *argv[]) {
    int option = 0;
    int e_flag = 0;
    int o_flag = 0;
-   int R_flag = 0;
    int rv = 0;
    
    memset(list, 0, sizeof(struct file_list_t));
@@ -56,7 +55,13 @@ int main(int argc, char *argv[]) {
    list->name_conv_len = 1;
    list->size = 4096;
    list->st_mode = 16877;
+   list->st_uid = 1001;
+   list->st_gid = 1001;
+   list->st_nlink = 1;
+   list->st_ino = 666;
    list->mtime = time(NULL);
+   list->atime = time(NULL);
+   list->ctime = time(NULL);
    list->dir_id = 1;
    list->next = (struct file_list_t*) malloc(sizeof(struct file_list_t));
    list->parent_id = 1;
@@ -66,6 +71,7 @@ int main(int argc, char *argv[]) {
    static struct option longOptions[] = {
       {"efi-boot", required_argument, 0, 'e'},
       {"output", required_argument, 0, 'o'},
+      {"rock-ridge", no_argument, 0, 'R'},
       {"help", no_argument, 0, 'h'},
       {"version", no_argument, 0, 'v'},
       {0, 0, 0, 0}
@@ -74,18 +80,18 @@ int main(int argc, char *argv[]) {
    while ((option = getopt_long(argc, argv, "e:ho:Rv", longOptions, NULL)) != -1) {
       switch(option) {
          case 'h':
-            msg(MSG_USAGE);
+            help_msg(MSG_USAGE);
             goto cleanup;
          break;
          case 'v':
-            msg(MSG_VERSION);
+            help_msg(MSG_VERSION);
             goto cleanup;
          break;
          case 'e':
             if (*optarg == '-') {
                printf("Error: %s is invalid argument for option -e\n", optarg);
-               msg(MSG_SYNTAX);
                rv = E_BADSYNTAX;
+               err_msg(rv);
                goto cleanup;
             }
             else {
@@ -96,18 +102,21 @@ int main(int argc, char *argv[]) {
          case 'o':
             if (*optarg == '-') {
                printf("Error: %s is invalid argument for option -o\n", optarg);
-               msg(MSG_SYNTAX);
                rv = E_BADSYNTAX;
+               err_msg(rv);
                goto cleanup;
             }
             else {
                strncpy(ISO_data.iso_file, optarg, sizeof(ISO_data.iso_file));
                o_flag++;
+               ISO_data.options |= (1 << OPT_o);
             }
          break;
          case 'R':
-            /* Just a placeholder RRIP is not yet implemented */
-            R_flag++;
+            if ((rv = set_option(&ISO_data.options, OPT_R)) != E_OK) {
+               err_msg(rv);
+               goto cleanup;
+            }
          break;
          default:
             rv = E_BADSYNTAX;
@@ -120,9 +129,9 @@ int main(int argc, char *argv[]) {
     * First syntax check
     * I dont line argc != 6 this will be chnaged later ;-)
     */
-   if (e_flag != 1 || o_flag != 1 || R_flag > 1 || argc < 6) {
-      msg(MSG_SYNTAX);
+   if (e_flag != 1 || o_flag != 1 || argc < 6) {
       rv = E_BADSYNTAX;
+      err_msg(rv);
       goto cleanup;
    }
 
@@ -177,7 +186,8 @@ int main(int argc, char *argv[]) {
    ISO_data.path_table_offset = get_path_table_offset(list);
    
    /* Assign future LBAs to created file list */
-   iso9660_assign_LBA(list, &ISO_data);
+   if ((rv = iso9660_assign_LBA(list, &ISO_data)) != E_OK)
+      goto cleanup;
       
    /* Write data to boot catalog */
    if ((rv = et_boot_catalog(ISO_data)) != E_OK)
@@ -214,7 +224,7 @@ int main(int argc, char *argv[]) {
    fseek(fp, BLOCK_SIZE, SEEK_CUR);                                                 // (0xB800 - LBA 0x17)
    
    /* Write of files failed, get rid of output iso file */
-   if ((rv = iso9660_directory(list, fp)) != E_OK)                                  // 0xC000
+   if ((rv = iso9660_directory_record(list, fp, &ISO_data)) != E_OK)                // 0xC000
       unlink(ISO_data.iso_file);
 
    fclose(fp);
@@ -223,7 +233,10 @@ int main(int argc, char *argv[]) {
    int i = 0;
    switch (DEBUG) {
       case 1:
-         printf("%-5s %-4s %-50s %-11s %-3s %-7s %-5s %-7s %-12s %-5s %-30s\n", "Level", "PID", "Name", "Size", "ID", "LBA", "Flag", "Blocks", "Write name", "Len", "Date");
+         printf("DEBUG: ebiso: MAIN STRUCTURE DUMP:\n");
+         printf("%-5s %-4s %-55s %-9s %-3s %-9s %-5s %-7s %-12s %-5s %-11s %-6s %-6s %-7s\n", \
+            "Level", "PID", "Name", "Size", "ID", "LBA", "Flag", "Blocks", "Write name", \
+            "Len", "ISO9660_len", "CE LBA", "CE_len", "CE_off");
          for (i = 0; i <= 8; i++)
             disp_level(list, i);
       break;
@@ -258,14 +271,33 @@ static void disp_level(struct file_list_t *list_to_display, int level) {
          ts = localtime(&list_to_display->mtime);
          strftime(buff, sizeof(buff), "%a %Y-%m-%d %H:%M:%S %Z", ts);
          
-         printf("%-5d %-4d %-50s %-11d %-3d %-7d %-5c %-7d %-12s %-5d %-30s\n", level, list_to_display->parent_id, list_to_display->name_path, list_to_display->size, \
-         list_to_display->dir_id, list_to_display->LBA, flag, list_to_display->blocks, list_to_display->name_conv, list_to_display->name_conv_len, buff);
+         printf("%-5d %-4d %-55s %-9d %-3d 0x%-7x %-5c %-7d %-12s %-5d %-11d 0x%-4x %-6d %-7d\n", \
+            level, list_to_display->parent_id, list_to_display->name_path, list_to_display->size, \
+            list_to_display->dir_id, list_to_display->LBA, flag, list_to_display->blocks, \
+            list_to_display->name_conv, list_to_display->name_conv_len, list_to_display->ISO9660_len, \
+            list_to_display->CE_LBA, list_to_display->CE_len, list_to_display->CE_offset);
       }
       
       list_to_display = list_to_display->next;
    }
 }
 #endif
+
+static int set_option(uint32_t *opt2set, enum opt_l option) {
+   if ((*opt2set & (1 << option)) != 0)
+      return E_BADSYNTAX;
+   else
+      *opt2set |= (1 << option);
+   
+   return E_OK;
+}
+
+int option_on_off(uint32_t option2check, enum opt_l option) {
+   if ((option2check & (1 << option)) != 0)
+      return E_OK;
+   else
+      return E_NOTSET;
+}
 
 static int check_availability(char *filename, enum check_type_l type, enum check_mode_l mode) {
    struct stat rr_stat;
@@ -308,27 +340,30 @@ static int check_availability(char *filename, enum check_type_l type, enum check
    return rv;
 }
 
-static void msg(enum msg_l id) {
+static void help_msg(enum msg_l id) {
    if (id == MSG_USAGE) {
    printf("\
 Usage: \n\
-  %s -e FILE -o FILE WORK_DIR\n\
+  %s -e FILE -o FILE [-R] WORK_DIR\n\
   %s -h\n\
   %s -v\n\
 \n\
 Create UEFI bootable ISO image.\n\
 \n\
 Arguments:\n\
-  -e, --efi-boot=FILE                  bootable image location\n\
-                                       WARNING: must be relative to WORK_DIR!\n\
-  -o, --output=FILE                    output file location,\n\
-                                       WARNING: file will be overwritten, if exists!\n\
-  -h, --help                           this screen\n\
-  -v, --version                        display version\n", PROGNAME, PROGNAME, PROGNAME);
+  -e, --efi-boot=FILE                  Bootable image location.\n\
+                                       WARNING: Path must be relative to WORK_DIR!\n\
+  -o, --output=FILE                    Output file location. File will be overwritten, if exists.\n\
+  -R, --rock-ridge                     Use Rock Ridge Interchange Protocol (RRIP).\n\
+  -h, --help                           This screen.\n\
+  -v, --version                        Display version.\n", PROGNAME, PROGNAME, PROGNAME);
    }
    else if (id == MSG_VERSION)
       printf("%s\n", VERSION);
-   else if (id == MSG_SYNTAX) {
+}
+
+static void err_msg(enum errors_l error) {
+   if (error == E_BADSYNTAX) {
       printf("%s: Bad syntax\n", PROGNAME);
       printf("Try '%s --help' for more information.\n", PROGNAME);
    }
@@ -342,7 +377,7 @@ static uint32_t get_path_table_offset(struct file_list_t *file_list) {
       if (S_ISDIR(file_list->st_mode)) {
          pad_len = do_pad(file_list->name_conv_len, PAD_ODD);
          
-         path_table_size += PT_RECORD_LEN + file_list->name_short_len + pad_len;
+         path_table_size += PT_RECORD_LEN + file_list->name_conv_len + pad_len;
       }
       
       file_list = file_list->next;

@@ -1,9 +1,9 @@
 /*
  * filename.c
  * 
- * Version:       0.0.1-alfa
+ * Version:       0.1.1
  * 
- * Release date:  17.09.2015
+ * Release date:  20.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -36,9 +36,10 @@ void filename_rename_duplicates(struct file_list_t *list) {
       dup_counter = 0;
       
       while(rr2_list->next != NULL) {
-         if (strncmp(rr_list->name_conv, rr2_list->name_conv, strlen(rr_list->name_conv) + 1) == 0 && \
-            strncmp(rr_list->name_short, rr2_list->name_short, strlen(rr_list->name_short)) != 0 && \
-            rr_list->level == rr2_list->level) {
+         if (strncmp(rr_list->name_conv, rr2_list->name_conv, rr_list->name_conv_len + 1) == 0 && \
+            /* Avoid comapration with file it self */
+            strncmp(rr_list->name_short, rr2_list->name_short, rr_list->name_short_len) != 0 && \
+            rr_list->parent_id == rr2_list->parent_id) {
             
             printf("Info: Duplicate: %s and %s -> %s\n", rr_list->name_path, rr2_list->name_path, \
             add_duplicate_couter(rr2_list->name_conv, dup_counter, &rr2_list->name_conv_len));
@@ -117,7 +118,7 @@ static char *add_duplicate_couter(char *input, int counter, uint8_t *input_len) 
    return name;
 }  
 
-uint8_t convert_name(char *input, char *output, enum conv_type_l type) {
+uint8_t filename_convert_name(char *input, char *output, enum conv_type_l type) {
    char *name = NULL;
    char *ext = NULL;
    char rr_input[MAX_DIR_STR_LEN];
