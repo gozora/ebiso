@@ -39,7 +39,7 @@ ${PROGNAME}: ${OBJ} ${PROGNAME}.c ${HEADERS}
 	${CC} ${FLAGS} -o ${PROGNAME} ${PROGNAME}.c ${LIBS}
 
 .PHONY: dist
-dist:
+dist: ${MAIN_LIB} ${PROGNAME} 
 	make clean
 	tar czf ../$(PROGNAME)-$(VERSION).tgz --transform='s,^${PROGNAME},$(PROGNAME)-$(VERSION),S' \
 	--exclude=.git \
