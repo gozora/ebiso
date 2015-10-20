@@ -1,9 +1,9 @@
 /*
  * write_files.c
  * 
- * Version:       0.0.3
+ * Version:       0.0.4
  * 
- * Release date:  10.10.2015
+ * Release date:  20.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -36,9 +36,7 @@ int write_files(struct file_list_t *file_list, FILE *dest) {
    memset(buffer, 0, sizeof(buffer));
    
    while(rr_file_list->next != NULL) {
-      /*
-       * Skip directories
-       */
+      /* Skip directories */
       if (S_ISDIR(rr_file_list->st_mode)) {
          rr_file_list = rr_file_list->next;
          continue;
@@ -57,9 +55,7 @@ int write_files(struct file_list_t *file_list, FILE *dest) {
       }
       
       memset(buffer, 0, sizeof(buffer));
-      /*
-       * Pad rest of the block
-       */
+      /* Pad rest of the block */
       if ((mod = rr_file_list->size % BLOCK_SIZE) != 0) {
          if (fwrite(buffer, 1, BLOCK_SIZE - mod, dest) != BLOCK_SIZE - mod) {
             perror("Error: pad()");
@@ -67,9 +63,7 @@ int write_files(struct file_list_t *file_list, FILE *dest) {
          }
       }
       
-      /*
-       * If file is zero size write BLOCK_SIZE of zeros
-       */
+      /* If file is zero size write BLOCK_SIZE of zeros */
       if (rr_file_list->size == 0)
          if (fwrite(buffer, 1, BLOCK_SIZE, dest) != BLOCK_SIZE) {
             perror("Error: pad()");

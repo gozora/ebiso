@@ -1,9 +1,9 @@
 /*
  * ebiso.c
  * 
- * Version:       0.1.1
+ * Version:       0.1.2
  * 
- * Release date:  20.09.2015
+ * Release date:  20.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -46,27 +46,6 @@ int main(int argc, char *argv[]) {
    memset(list, 0, sizeof(struct file_list_t));
    memset(boot_descriptor, 0, BLOCK_SIZE);
    memset(&ISO_data, 0, sizeof(struct ISO_data_t));
-   
-   /*
-    * Artificially create root directory record
-    */
-   strncpy(list->name_path, ".", 1);
-   list->name_short_len = 1;
-   list->name_conv_len = 1;
-   list->size = 4096;
-   list->st_mode = 16877;
-   list->st_uid = 1001;
-   list->st_gid = 1001;
-   list->st_nlink = 1;
-   list->st_ino = 666;
-   list->mtime = time(NULL);
-   list->atime = time(NULL);
-   list->ctime = time(NULL);
-   list->dir_id = 1;
-   list->next = (struct file_list_t*) malloc(sizeof(struct file_list_t));
-   list->parent_id = 1;
-   rr_list = list->next;
-   memset(rr_list, 0, sizeof(struct file_list_t));
    
    static struct option longOptions[] = {
       {"efi-boot", required_argument, 0, 'e'},
@@ -125,10 +104,7 @@ int main(int argc, char *argv[]) {
       }
    }
    
-   /*
-    * First syntax check
-    * I dont line argc != 6 this will be chnaged later ;-)
-    */
+   /* First syntax check */
    if (e_flag != 1 || o_flag != 1 || argc < 6) {
       rv = E_BADSYNTAX;
       err_msg(rv);
@@ -142,12 +118,22 @@ int main(int argc, char *argv[]) {
    snprintf(ISO_data.boot_cat_file, MAX_DIR_STR_LEN, "%s/%s", ISO_data.work_dir, "BOOT.CAT");
    snprintf(ISO_data.efi_boot_file_full, MAX_DIR_STR_LEN, "%s/%s", ISO_data.work_dir, ISO_data.efi_boot_file);
    
-   /* Check if we can read working dir */
-   if ((rv = check_availability(ISO_data.work_dir, TYPE_DIR, MODE_READ)) != 0)
+   /* Check if we can read working dir & add some stat info for ABS root directory */
+   if ((rv = check_availability(ISO_data.work_dir, TYPE_DIR, MODE_READ, list)) != 0)
       goto cleanup;
    
+   /* Fill some additional info about ABS root directory */
+   strncpy(list->name_path, ".", 1);
+   list->name_short_len = 1;
+   list->name_conv_len = 1;
+   list->dir_id = 1;
+   list->parent_id = 1;
+   list->next = (struct file_list_t*) malloc(sizeof(struct file_list_t));
+   rr_list = list->next;
+   memset(rr_list, 0, sizeof(struct file_list_t));
+   
    /* Check if we can read UEFI boot image */
-   if ((rv = check_availability(ISO_data.efi_boot_file_full, TYPE_FILE, MODE_READ)) != 0)
+   if ((rv = check_availability(ISO_data.efi_boot_file_full, TYPE_FILE, MODE_READ, NULL)) != 0)
       goto cleanup;
    
    /*
@@ -223,20 +209,21 @@ int main(int argc, char *argv[]) {
    fwrite(path_table_MSB, (ISO_data.path_table_offset + 1) * BLOCK_SIZE, 1, fp);    // (0xB000 - LBA 0x16)
    fseek(fp, BLOCK_SIZE, SEEK_CUR);                                                 // (0xB800 - LBA 0x17)
    
-   /* Write of files failed, get rid of output iso file */
+   /* If write of files failed, get rid of output iso file */
    if ((rv = iso9660_directory_record(list, fp, &ISO_data)) != E_OK)                // 0xC000
       unlink(ISO_data.iso_file);
 
    fclose(fp);
    
 #ifdef DEBUG
+   printf("DEBUG: main(): Number of directories: [%d]\n", ISO_data.dir_count);
    int i = 0;
    switch (DEBUG) {
       case 1:
-         printf("DEBUG: ebiso: MAIN STRUCTURE DUMP:\n");
-         printf("%-5s %-4s %-55s %-9s %-3s %-9s %-5s %-7s %-12s %-5s %-11s %-6s %-6s %-7s\n", \
-            "Level", "PID", "Name", "Size", "ID", "LBA", "Flag", "Blocks", "Write name", \
-            "Len", "ISO9660_len", "CE LBA", "CE_len", "CE_off");
+         printf("DEBUG: main(): MAIN STRUCTURE DUMP:\n");
+         printf("%-5s %-4s %-55s %-11s %-3s %-9s %-5s %-7s %-12s %-5s %-11s %-6s %-8s %-7s\n", \
+            "Level", "PID", "Name", "Size", "ID", "LBA", "Flag", "Blocks", "conf_name", \
+            "Len", "ISO9660_len", "CE_LBA", "Full_len", "CE_off");
          for (i = 0; i <= 8; i++)
             disp_level(list, i);
       break;
@@ -271,11 +258,11 @@ static void disp_level(struct file_list_t *list_to_display, int level) {
          ts = localtime(&list_to_display->mtime);
          strftime(buff, sizeof(buff), "%a %Y-%m-%d %H:%M:%S %Z", ts);
          
-         printf("%-5d %-4d %-55s %-9d %-3d 0x%-7x %-5c %-7d %-12s %-5d %-11d 0x%-4x %-6d %-7d\n", \
+         printf("%-5d %-4d %-55s 0x%-9x %-3d 0x%-7x %-5c %-7d %-12s %-5d 0x%-9x 0x%-4x 0x%-6x 0x%-5x\n", \
             level, list_to_display->parent_id, list_to_display->name_path, list_to_display->size, \
             list_to_display->dir_id, list_to_display->LBA, flag, list_to_display->blocks, \
             list_to_display->name_conv, list_to_display->name_conv_len, list_to_display->ISO9660_len, \
-            list_to_display->CE_LBA, list_to_display->CE_len, list_to_display->CE_offset);
+            list_to_display->CE_LBA, list_to_display->full_len, list_to_display->CE_offset);
       }
       
       list_to_display = list_to_display->next;
@@ -299,9 +286,9 @@ int option_on_off(uint32_t option2check, enum opt_l option) {
       return E_NOTSET;
 }
 
-static int check_availability(char *filename, enum check_type_l type, enum check_mode_l mode) {
+static int check_availability(char *filename, enum check_type_l type, enum check_mode_l mode, struct file_list_t *file_list) {
    struct stat rr_stat;
-   int rv = 0;
+   int rv = E_OK;
    
    memset(&rr_stat, 0, sizeof(struct stat));
    
@@ -336,6 +323,19 @@ static int check_availability(char *filename, enum check_type_l type, enum check
          rv = E_NOTDIR;
       }
    }
+   
+   if (file_list != NULL) {
+      file_list->size = rr_stat.st_size;
+      file_list->st_mode = rr_stat.st_mode;
+      file_list->st_uid = rr_stat.st_uid;
+      file_list->st_gid = rr_stat.st_gid;
+      file_list->st_nlink = rr_stat.st_nlink;
+      file_list->st_ino = rr_stat.st_ino;
+      file_list->mtime = rr_stat.st_mtime;
+      file_list->atime = rr_stat.st_atime;
+      file_list->ctime = rr_stat.st_ctime;
+   }
+   
    
    return rv;
 }

@@ -1,9 +1,9 @@
 /*
  * iso9660.c
  * 
- * Version:       0.1.1
+ * Version:       0.2.0
  * 
- * Release date:  20.09.2015
+ * Release date:  20.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -27,16 +27,14 @@
 
 #include "iso9660.h"
 
-/* 
- * Rockridge 
- */
+/* Rockridge */
 unsigned char CE[28];
+unsigned char ER[237];
 unsigned char SP[7];
 unsigned char RR[5];
 unsigned char PX[44];               // 1<<0
 unsigned char TF[26];               // 1<<7
 unsigned char *NM;                  // 1<<3
-int rock_ridge_header_size = 0;
 const enum rrip_fields_t init_fields = RRIP_INIT_FIELDS;
 
 void iso9660_cp2heap(void **dest, const void *source, long int size, uint32_t *dest_size) {
@@ -239,8 +237,9 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
    int total_len = 0;
    int dir_rec_len = 0;
    int counter = 1;
-   int min_dir_len = 2 * (DIR_RECORD_LEN + 1);
+   int min_dir_len = 2 * (DIR_RECORD_LEN + 1);                       // Directory recod begins with two entries of directory it self
    int additional_bytes = 0;
+   int rock_ridge_header_size = 0;
    int rv = E_OK;
    uint32_t LBA = LBA_ROOT + (2 * ISO_data->path_table_offset);      // Move first LBA if path tables are larger that BLOCK_SIZE
    uint8_t pad_len = 0;
@@ -256,11 +255,13 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
       rock_ridge_on = TRUE;
    }
    
-   /* 
-    * #adjust for long directory names RRIP CE ...
-    * Assign LBA to dirs first 
-    */
-   CEarr_init_list(&CE_list, 2);
+   /* Initialize CE_list for directory records */
+   if ((rv = CEarr_init_list(&CE_list, CE_LIST_PREALLOC)) != E_OK) {
+      CEarr_destroy_list(&CE_list);
+      return rv;
+   }
+   
+   /* Assign LBAs to directories first */
    while(rr_file_list->next != NULL) {
       if (S_ISDIR(rr_file_list->st_mode)) {
          
@@ -280,7 +281,7 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
             /* CE entry should always exist for absolute root */
             rr_file_list->CE_LBA = 1;
             
-            rr_file_list->CE_len = rr_file_list->ISO9660_len + 0xED;
+            rr_file_list->full_len = rr_file_list->ISO9660_len + sizeof(ER);
          }
          
          /* Calculate how much blocks will parent directory occupy */
@@ -292,7 +293,7 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
                continue;
             }
             else if (tmp_file_list->parent_id == rr_file_list->dir_id) {
-               int rr_len = 0;
+               int rr_len = 0;         // Represent individual len of each record
                
                pad_len = do_pad(tmp_file_list->name_conv_len, PAD_EVEN);
                terminator_len = set_terminator_len(tmp_file_list->st_mode);
@@ -308,29 +309,40 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
                   dir_rec_len += rock_ridge_header_size + additional_bytes;
                   rr_len += rock_ridge_header_size + additional_bytes;
                   
-                  /* At the end, we must have EVEN number of bytes */
-                  (dir_rec_len % 2 == 0) ? dir_rec_len : dir_rec_len++;
-                  (rr_len % 2 == 0) ? rr_len : rr_len++;
-               }
-               
-               /* Set flag for CE creation if entry is longer than 255 bytes */
-               if (rr_len > 0xFF) {
-                  tmp_file_list->CE_LBA = 1;
-                  tmp_file_list->ISO9660_len = DIR_RECORD_LEN + tmp_file_list->name_conv_len + terminator_len + pad_len + sizeof(CE);
-                  tmp_file_list->CE_len = rr_len + sizeof(CE);
-                  
-                  if (tmp_file_list->name_short_len >= 250) {
-                     int rest = tmp_file_list->name_short_len - 250;
+                  /* 
+                   * Set flag for CE creation if entry is longer than 255 bytes.
+                   * tmp_file_list->full_len is used only if CE record is needed,
+                   * otherwise tmp_file_list->ISO9660 is sufficient.
+                   */
+                  if (rr_len >= 0xFF) {
+                     tmp_file_list->CE_LBA = 1;
+                     tmp_file_list->ISO9660_len = DIR_RECORD_LEN + tmp_file_list->name_conv_len + terminator_len + pad_len + sizeof(CE);
                      
-                     if (rest % 2 == 0)
-                        tmp_file_list->CE_len += 6;
-                     else
-                        tmp_file_list->CE_len += 4;
+                     dir_rec_len -= rock_ridge_header_size + additional_bytes;
+                     dir_rec_len += sizeof(CE);
+                     
+                     tmp_file_list->full_len = rr_len + sizeof(CE);
+                     
+                     /* 
+                      * Create another NM entry if needed
+                      * 250 is max len of payload for uint8 togeather with NM entry header.
+                      * Without this NM entry len could overfow.
+                      */
+                     if (tmp_file_list->name_short_len >= 250)
+                        tmp_file_list->full_len += 5;             // Count in another 5 bytes for NM entry header
+                     
+                     /* Allign to even bytes count in the end */
+                     (tmp_file_list->full_len % 2 == 0) ? tmp_file_list->full_len : (tmp_file_list)->full_len++;
+                     
+                  }
+                  else {
+                     (rr_len % 2 == 0) ? rr_len : rr_len++;
+                     tmp_file_list->ISO9660_len = rr_len;
                   }
                   
+                  /* Allign to even bytes count in the end */
+                  (dir_rec_len % 2 == 0) ? dir_rec_len : dir_rec_len++;
                }
-               else
-                  tmp_file_list->ISO9660_len = rr_len;
                
                /* Allign entry at the end of the block */
                if (total_len + dir_rec_len <= counter * BLOCK_SIZE)
@@ -353,16 +365,22 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
          rr_file_list->size = total_len;
          rr_file_list->blocks = blocks_count(total_len);
          
-         /* Save largest continous directory block */
+         /* 
+          * Save largest continous directory block.
+          * This will be used for memory allocation later in iso9660_directory_record().
+          */
          if (rr_file_list->blocks > ISO_data->largest_cont_block)
             ISO_data->largest_cont_block = rr_file_list->blocks;
          
          rr_file_list->LBA = LBA;
          LBA += rr_file_list->blocks;
          
-         /* Assign LBA to CE directory records */
+         /* 
+          * Assign LBA to CE directory records.
+          * Warning: This function increments LBA.
+          */
          if (rr_file_list->CE_LBA == 1) {
-            if ((rv = CEarr_reccord_num(&CE_list, rr_file_list, &LBA)) != E_OK) {
+            if ((rv = CE_assign_LBA(&CE_list, rr_file_list, &LBA)) != E_OK) {
                CEarr_destroy_list(&CE_list);
                return rv;
             }
@@ -375,17 +393,22 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
    }
    CEarr_destroy_list(&CE_list);
 
-   /* If there is a need for CE, reserve LBA */
-   rr_file_list = file_list;
-   CEarr_init_list(&CE_list, 2);
+   /* Initialize CE_list for non-directory records */
+   if ((rv = CEarr_init_list(&CE_list, CE_LIST_PREALLOC)) != E_OK) {
+      CEarr_destroy_list(&CE_list);
+      return rv;
+   }
    
+   /* Assign CE LBAs to non-directory records */
+   rr_file_list = file_list;
    while(rr_file_list->next != NULL) {
       if (rr_file_list->CE_LBA == 1) {
+         
          /* 
-          * Assign LBA to CE records.
+          * Assign LBA to CE file records.
           * Warning: This function increments LBA.
           */
-         if ((rv = CEarr_reccord_num(&CE_list, rr_file_list, &LBA)) != E_OK) {
+         if ((rv = CE_assign_LBA(&CE_list, rr_file_list, &LBA)) != E_OK) {
             CEarr_destroy_list(&CE_list);
             return rv;
          }
@@ -395,7 +418,7 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
    }
    CEarr_destroy_list(&CE_list);
    
-   /* Assign first 2 file LBAs to BOOT.CAT and UEFI boot image */
+   /* Assign first 2 file LBAs for BOOT.CAT and UEFI boot image (virtual image) */
    search_result = list_search(file_list, ISO_data->boot_cat_file);
    search_result->LBA = LBA;
    ISO_data->boot_cat_LBA = LBA;
@@ -413,13 +436,9 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
       && strncmp(rr_file_list->name_path, ISO_data->efi_boot_file_full, strlen(ISO_data->efi_boot_file_full)) ) {
 
          rr_file_list->LBA = LBA;
-         
          rr_file_list->blocks = blocks_count(rr_file_list->size);
-         
          LBA = LBA + rr_file_list->blocks;
-         
       }
-      
       rr_file_list = rr_file_list->next;
    }
    
@@ -478,6 +497,7 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
        */
       tmp_file_list = file_list;
       int CE_offset = 0;
+      uint32_t CE_save_LBA = 0;
       while(tmp_file_list->next != NULL) {
          
          /*
@@ -494,10 +514,7 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
             entry_len = construct_dir_record(tmp_file_list, &directory_table, type);
             bytes_written += entry_len;
             
-            /* #adjust
-             * Create CE record if needed
-             * This still dosent cover full possible 255 bytes 
-             */
+             /* Create CE record if needed */
             if (tmp_file_list->CE_LBA != 0) {
                void *rr_CE = CE + 4;
                void *CE_start = NULL;
@@ -508,6 +525,12 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
                uint32_t rr_write = 0;
                uint8_t pad_len = 0;
                uint8_t terminator_len = 0;
+               
+               if (CE_save_LBA == 0)
+                  CE_save_LBA = tmp_file_list->CE_LBA;
+               
+               if (CE_save_LBA != tmp_file_list->CE_LBA)
+                  CE_offset = 0;
                
                terminator_len = set_terminator_len(tmp_file_list->st_mode);
                pad_len = do_pad(tmp_file_list->name_conv_len, PAD_EVEN);                                       // Dir record must start on EVEN byte
@@ -520,7 +543,7 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
                fwrite(rr_save_ptr + basic_iso9660_len, 1, entry_len - basic_iso9660_len, dest);                // Write everything after standard dir record
                
                memset(rr_CE, 0, BLOCK_SIZE - 4);
-               iso9660_cp2heap(&rr_CE, &CE_LBA, sizeof(CE_LBA), &rr_write);                                // rr_write is here only to ensure move of pointer
+               iso9660_cp2heap(&rr_CE, &CE_LBA, sizeof(CE_LBA), &rr_write);                                    // rr_write is here only to ensure move of pointer
                iso9660_cp2heap(&rr_CE, &CE_offset_LSB_MSB, sizeof(CE_offset_LSB_MSB), &rr_write);
                iso9660_cp2heap(&rr_CE, &CE_len, sizeof(CE_len), &rr_write);
                
@@ -537,8 +560,10 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
                bytes_written += tmp_file_list->ISO9660_len;
                
                tmp_file_list->CE_offset = CE_offset;
-               CE_offset += (tmp_file_list->CE_len - tmp_file_list->ISO9660_len);
-         }
+               CE_offset += (tmp_file_list->full_len - tmp_file_list->ISO9660_len);
+               
+               CE_save_LBA = tmp_file_list->CE_LBA;
+            }
             
             /* Allign directory entry to BLOCK_SIZE */
             if (bytes_written > BLOCK_SIZE) {
@@ -560,18 +585,12 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
       rr_file_list = rr_file_list->next;
    }
    
-   /* #adjust */
-   char ER[237] = {0x45, 0x52, 0xED, 0x1, 0x0a, 0x54, 0x87, 0x01};
-   char ER_text[] = "RRIP_1991ATHE ROCK RIDGE INTERCHANGE PROTOCOL PROVIDES SUPPORT FOR POSIX FILE SYSTEM \
-SEMANTICSPLEASE CONTACT DISC PUBLISHER FOR SPECIFICATION SOURCE.  SEE PUBLISHER IDENTIFIER IN PRIMARY \
-VOLUME DESCRIPTOR FOR CONTACT INFORMATION.";
-   
-   strcat(ER, ER_text);
-   
+   /* Write ER entry of ABS root directory */
    rr_file_list = file_list;
    fseek(dest, rr_file_list->CE_LBA * BLOCK_SIZE, SEEK_SET);
    fwrite(ER, 1, sizeof(ER), dest);
-
+   
+   /* Write files */
    rv = write_files(file_list, dest);
 
    free(directory_table_start);
@@ -671,6 +690,7 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
    else
       name_len = rr_file_list->name_conv_len + terminator_len;
    
+   /* Create basic ISO9660 structure */
    iso9660_cp2heap(&rr_directory_table, &zero, sizeof(uint8_t), &directory_table_size);               // Lenght of whole entry will be added at the end
    iso9660_cp2heap(&rr_directory_table, &ext_attr_record, sizeof(uint8_t), &directory_table_size);    // Ext. attr. record
    iso9660_cp2heap(&rr_directory_table, &LBA, sizeof(uint64_t), &directory_table_size);               // LBA
@@ -682,7 +702,7 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
    iso9660_cp2heap(&rr_directory_table, &volume_seq_number, sizeof(uint32_t), &directory_table_size); // Volume sequence number
    iso9660_cp2heap(&rr_directory_table, &name_len, sizeof(uint8_t), &directory_table_size);           // File name len
    
-   /* File name */
+   /* Add file name */
    if (type == ISO9660_ROOT || type == ROOT_HEADER || type == RRIP_ROOT)
       iso9660_cp2heap(&rr_directory_table, &zero, name_len, &directory_table_size);
    else
@@ -692,7 +712,7 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
    if (!S_ISDIR(rr_file_list->st_mode))
       iso9660_cp2heap(&rr_directory_table, file_terminator, terminator_len, &directory_table_size);
    
-   /* Do padding of even len file names*/
+   /* Do padding of even len file names */
    if (pad_len == 1)
       iso9660_cp2heap(&rr_directory_table, &zero, pad_len, &directory_table_size);
    
@@ -824,6 +844,8 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
          RR[4] |= 1 << 7;                 // TF record in use
       
       memset(NM + 5, 0, BLOCK_SIZE - 5);
+      
+      /* Prepare for another possible NM entry */
       if (rr_file_list->name_short_len >= 250) {
          rest = rr_file_list->name_short_len - 250;
          rr_file_list->name_short_len = 250;
@@ -835,12 +857,14 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
       if ((init_fields & rrip_RR) != 0)
          iso9660_cp2heap(&rr_directory_table, RR, sizeof(RR), &directory_table_size);
       
+      /* Set flag that NM entry will continue at next NM entry */
       if ((init_fields & rrip_NM) != 0) {
          if (rest != 0)
             NM[4] = 1;
          
          iso9660_cp2heap(&rr_directory_table, NM, rr_file_list->name_short_len + 5, &directory_table_size);
          
+         /* Add second NM entry if needed */
          if (rest != 0) {
             memset(NM + 4, 0, BLOCK_SIZE - 4);
             NM[2] = 5 + rest;
@@ -972,23 +996,39 @@ static void str_var_prepare(char *input, char fill_char, size_t input_size) {
 static int init_RRIP(void) {
    size_t rr_size = 0;
    int header_size = 0;
+   char ER_text[] = "RRIP_1991ATHE ROCK RIDGE INTERCHANGE PROTOCOL PROVIDES SUPPORT FOR POSIX FILE SYSTEM \
+SEMANTICSPLEASE CONTACT DISC PUBLISHER FOR SPECIFICATION SOURCE.  SEE PUBLISHER IDENTIFIER IN PRIMARY \
+VOLUME DESCRIPTOR FOR CONTACT INFORMATION.";
    
    rr_size = sizeof(SP);
    memset(SP, 0, rr_size);
    SP[0] = 'S';
    SP[1] = 'P'; 
    SP[2] = rr_size;
-   SP[3] =  1;
-   SP[4] = 0xBE;
-   SP[5] = 0xEF;
-   SP[6] = 0;
+   SP[3] = 1;           // SUSP Version
+   SP[4] = 0xBE;        // Check byte
+   SP[5] = 0xEF;        // Check byte
+   SP[6] = 0;           // Len skip
    
    rr_size = sizeof(CE);
    memset(CE, 0, rr_size);
    CE[0] = 'C';
    CE[1] = 'E';
    CE[2] = rr_size;
-   CE[3] = 1;
+   CE[3] = 1;           // SUSP Version
+   
+   rr_size = sizeof(ER);
+   memset(ER, 0, rr_size);
+   ER[0] = 'E';
+   ER[1] = 'R';
+   ER[2] = rr_size;     // Size
+   ER[3] = 1;           // SUSP Version
+   ER[4] = 0x0A;        // Len ID
+   ER[5] = 0x54;        // Len descriptor
+   ER[6] = 0x87;        // Len source
+   ER[7] = 0x01;        // Extension version
+   
+   strcat((char *)ER, ER_text);
    
    if ((init_fields & rrip_RR) != 0) {
       rr_size = sizeof(RR);

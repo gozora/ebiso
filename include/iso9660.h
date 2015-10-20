@@ -1,9 +1,9 @@
 /*
  * iso9660.h
  * 
- * Version:       0.1.1
+ * Version:       0.2.0
  * 
- * Release date:  20.09.2015
+ * Release date:  20.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -28,6 +28,8 @@
 #include "globals.h"
 #include <time.h>
 
+#define CE_LIST_PREALLOC 32
+
 enum segment_list_t {
    ISO9660_ROOT,
    ISO9660,
@@ -48,7 +50,7 @@ enum rrip_fields_t {
 extern int option_on_off(uint32_t option2check, enum opt_l option);
 extern int write_files(struct file_list_t *file_list, FILE *dest);
 extern struct file_list_t *list_search(struct file_list_t *file_list, char *needle);
-extern int CEarr_reccord_num(struct CE_list_t *CE_list, struct file_list_t *file_list, uint32_t *LBA);
+extern int CE_assign_LBA(struct CE_list_t *CE_list, struct file_list_t *file_list, uint32_t *LBA);
 extern int CEarr_init_list(struct CE_list_t *CE_list, int arr_prealloc);
 extern void CEarr_destroy_list(struct CE_list_t *CE_list);
 

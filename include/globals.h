@@ -1,9 +1,9 @@
 /*
  * globals.h
  * 
- * Version:       0.0.3-alfa
+ * Version:       0.4.0
  * 
- * Release date:  17.09.2015
+ * Release date:  20.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -45,6 +45,9 @@
 #define ARR_PREALLOC 20
 #define RRIP_INIT_FIELDS rrip_RR | rrip_PX | rrip_TF | rrip_NM
 //#define RRIP_INIT_FIELDS rrip_RR | rrip_PX | rrip_TF
+//#define RRIP_INIT_FIELDS rrip_NM
+
+#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 
 static const uint8_t zero = 0;
 static const uint8_t one = 1;
@@ -93,6 +96,7 @@ typedef enum bool_t {
 struct CE_list_t {
    unsigned int *pid;
    unsigned int *lba;
+   unsigned int *CE_used;
    size_t members;
    size_t arr_size;
    const int arr_prealloc;
@@ -115,7 +119,7 @@ struct file_list_t {
    int dir_id;
    int level;
    int blocks;
-   int CE_len;
+   int full_len;                          // ISO9660_len + sizeof(CE entry)
    int CE_offset;
    uint32_t LBA;
    uint32_t CE_LBA;

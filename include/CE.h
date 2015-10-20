@@ -1,9 +1,9 @@
 /*
- * CEarr.h
+ * CE.h
  * 
- * Version:       0.0.1
+ * Version:       0.2.0
  * 
- * Release date:  09.10.2015
+ * Release date:  20.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -30,9 +30,9 @@
 #include <search.h>
 
 /* iso9660.c */
-int CEarr_reccord_num(struct CE_list_t *CE_list, struct file_list_t *file_list, uint32_t *LBA);
-int CEarr_init_list(struct CE_list_t *CE_list, int arr_prealloc);
+int CE_assign_LBA(struct CE_list_t *CE_list, struct file_list_t *file_list, uint32_t *LBA);
 void CEarr_destroy_list(struct CE_list_t *CE_list);
+int CEarr_init_list(struct CE_list_t *CE_list, int arr_prealloc);
 
-static int malloc_CE_list(struct CE_list_t *CE_list);
+static int realloc_CE_list(struct CE_list_t *CE_list);
 static int compar(const void *a, const void *b);
