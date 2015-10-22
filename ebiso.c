@@ -1,9 +1,9 @@
 /*
  * ebiso.c
  * 
- * Version:       0.1.2
+ * Version:       0.1.3
  * 
- * Release date:  20.10.2015
+ * Release date:  21.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -224,7 +224,7 @@ int main(int argc, char *argv[]) {
          printf("%-5s %-4s %-55s %-11s %-3s %-9s %-5s %-7s %-12s %-5s %-11s %-6s %-8s %-7s\n", \
             "Level", "PID", "Name", "Size", "ID", "LBA", "Flag", "Blocks", "conf_name", \
             "Len", "ISO9660_len", "CE_LBA", "Full_len", "CE_off");
-         for (i = 0; i <= 8; i++)
+         for (i = 0; i <= 128; i++)
             disp_level(list, i);
       break;
    }

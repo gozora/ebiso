@@ -1,9 +1,9 @@
 /*
  * ebiso.h
  * 
- * Version:       0.1.2
+ * Version:       0.1.3
  * 
- * Release date:  20.10.2015
+ * Release date:  21.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -33,7 +33,7 @@
 #include <getopt.h>
 
 #define PROGNAME "ebiso"
-#define VERSION "0.1.2"
+#define VERSION "0.1.3"
 
 #ifdef DEBUG
 static void disp_level(struct file_list_t *list_to_display, int level);

@@ -1,7 +1,7 @@
 /*
  * iso9660.c
  * 
- * Version:       0.2.0
+ * Version:       0.2.1
  * 
  * Release date:  20.10.2015
  * 
@@ -71,7 +71,7 @@ uint32_t iso9660_header(void **header, struct file_list_t file_list, struct ISO_
    int offset = ISO_data.path_table_size / (BLOCK_SIZE + 1);
    uint32_t header_size = 0;
    time_t time_now = time(NULL);
-
+   
    char system_identifier[32] = VOLUME_ID;                                    // "LINUX"
    char volume_identifier[32] = SYSTEM_ID;                                    // "CDROM"
    uint64_t volume_space_size = get_int32_LSB_MSB(ISO_data.LBA_last);         // Size of whole ISO image in blocks ( * BLOCK_SIZE = ISO size [B])
@@ -194,13 +194,14 @@ int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum en
          /* Dynamic memory allocation BEGIN */
          entry_len = PT_RECORD_LEN + rr_file_list->name_conv_len + pad_len;
          mem_free -= entry_len;
+
          if (mem_free < 0) {
             count++;
             
             if ((tmp_realloc = realloc(path_table_start, count * BLOCK_SIZE)) != NULL) {
                path_table_start = tmp_realloc;
-               mem_free = BLOCK_SIZE + (BLOCK_SIZE - path_table_size);
-               memset(path_table_start + BLOCK_SIZE, 0, BLOCK_SIZE);
+               mem_free = BLOCK_SIZE + mem_free;
+               memset(path_table_start + (count * BLOCK_SIZE) - BLOCK_SIZE, 0, BLOCK_SIZE);
                rr_path_table = path_table_start + path_table_size;
             }
             else {
