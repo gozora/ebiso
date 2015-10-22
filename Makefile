@@ -25,13 +25,12 @@ HEADERS=$(wildcard ${INCLUDEDIR}/*.h)
 OBJ=$(addprefix ${LIBDIR}/,$(notdir $(SRC:.c=.o)))
 
 # some variables for building RPMs
-prefix = /usr
-bindir = $(prefix)/bin
+bindir = $(INSTDIR)
 specfile = packaging/$(PROGNAME).spec
 distversion = $(VERSION)
 rpmrelease = %nil
 obsproject = home:gdha
-obspackage = $(name)-$(version)
+obspackage = $(PROGNAME)-$(distversion)
 # end of some variables for building RPMs
 
 all: ${MAIN_LIB} ${PROGNAME}
@@ -67,9 +66,9 @@ clean:
 	rm -rf ${BASE_DEPDIR}
 
 .PHONY: rpm
-rpm: dist
+rpm: dist $(specfile)
 	@echo -e "\033[1m== Building RPM package $(PROGNAME)-$(distversion) ==\033[0;0m"
-	rpmbuild -v  \
+	rpmbuild -v --clean  \
 		--define "_rpmfilename %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm" \
 		--define "debug_package %{nil}" \
 		--define "_rpmdir %(pwd)" \
