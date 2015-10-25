@@ -1,9 +1,9 @@
 /*
  * iso9660.c
  * 
- * Version:       0.2.1
+ * Version:       0.2.2
  * 
- * Release date:  20.10.2015
+ * Release date:  25.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -135,7 +135,7 @@ uint32_t iso9660_header(void **header, struct file_list_t file_list, struct ISO_
    iso9660_cp2heap(&rr_header, &opath_table_LBA_BE, sizeof(uint32_t), &header_size);                  // LBA of type-M optional path table (big endian)
    
    /* Create root directory record for header */
-   construct_dir_record(&file_list, &rr_header, ROOT_HEADER);
+   construct_dir_record(&file_list, NULL, &rr_header, ROOT_HEADER);
    
    iso9660_cp2heap(&rr_header, volume_set_id, sizeof(volume_set_id), &header_size);
    iso9660_cp2heap(&rr_header, publisher_id, sizeof(publisher_id), &header_size);
@@ -257,7 +257,7 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
    }
    
    /* Initialize CE_list for directory records */
-   if ((rv = CEarr_init_list(&CE_list, CE_LIST_PREALLOC)) != E_OK) {
+   if (rock_ridge_on == TRUE && (rv = CEarr_init_list(&CE_list, CE_LIST_PREALLOC)) != E_OK) {
       CEarr_destroy_list(&CE_list);
       return rv;
    }
@@ -387,15 +387,15 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
             }
          }
          
-         ISO_data->dir_count++;
       }
       
       rr_file_list = rr_file_list->next;
    }
-   CEarr_destroy_list(&CE_list);
+   if (rock_ridge_on == TRUE)
+      CEarr_destroy_list(&CE_list);
 
    /* Initialize CE_list for non-directory records */
-   if ((rv = CEarr_init_list(&CE_list, CE_LIST_PREALLOC)) != E_OK) {
+   if (rock_ridge_on == TRUE && (rv = CEarr_init_list(&CE_list, CE_LIST_PREALLOC)) != E_OK) {
       CEarr_destroy_list(&CE_list);
       return rv;
    }
@@ -417,15 +417,17 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
       
       rr_file_list = rr_file_list->next;
    }
-   CEarr_destroy_list(&CE_list);
+   
+   if (rock_ridge_on == TRUE)
+      CEarr_destroy_list(&CE_list);
    
    /* Assign first 2 file LBAs for BOOT.CAT and UEFI boot image (virtual image) */
-   search_result = list_search(file_list, ISO_data->boot_cat_file);
+   search_result = list_search_name(file_list, ISO_data->boot_cat_file);
    search_result->LBA = LBA;
    ISO_data->boot_cat_LBA = LBA;
    LBA += blocks_count(search_result->size);
    
-   search_result = list_search(file_list, ISO_data->efi_boot_file_full);
+   search_result = list_search_name(file_list, ISO_data->efi_boot_file_full);
    search_result->LBA = LBA;
    search_result->blocks = blocks_count(search_result->size);
    LBA += search_result->blocks;
@@ -454,12 +456,14 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
    void *rr_save_ptr = NULL;
    struct file_list_t *rr_file_list = file_list;
    struct file_list_t *tmp_file_list = NULL;
+   struct file_list_t **parent_index = NULL;
    int directory_table_size = BLOCK_SIZE * ISO_data->largest_cont_block;
-   int rv = 0;
+   int parent_index_size = sizeof(struct file_list_t *) * ISO_data->dir_count;
+   int rv = E_OK;
    int entry_len = 0;
    int bytes_written = 0;
-   uint8_t rock_ridge_on = FALSE;
    int offset = 0;
+   uint8_t rock_ridge_on = FALSE;
    enum segment_list_t type = 0;
    
    if (option_on_off(ISO_data->options, OPT_R) == E_OK)
@@ -467,8 +471,17 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
    
    if ((directory_table_start = (void *) malloc(directory_table_size)) == NULL) {
       printf("Error: iso9660_path_table(): Memory allocation failed\n");
-      return E_MALLOC;
+      rv = E_MALLOC;
+      goto cleanup;
    }
+   
+   if ((parent_index = (struct file_list_t **) malloc(parent_index_size)) == NULL ) {
+      printf("Error: iso9660_path_table(): Memory allocation failed.\n");
+      rv = E_MALLOC;
+      goto cleanup;
+   }
+   else
+      memset(parent_index, 0, parent_index_size);
    
    while(rr_file_list->next != NULL) {
       
@@ -482,15 +495,19 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
       memset(directory_table_start, 0, directory_table_size);
       
       /* 
-       * Entry for absolute root will be a bit different
-       * Create ROOT record for CURRENT directory 
+       * Entry for ABS root will be a bit different
+       * Create records for '.' & '..'
        */
       if (strncmp(rr_file_list->name_path, ".", 2) == 0)
          type = (rock_ridge_on == TRUE) ? RRIP_ABS_ROOT : ISO9660_ROOT;
       else
          type = (rock_ridge_on == TRUE) ? RRIP_ROOT : ISO9660_ROOT;
       
-      bytes_written = construct_dir_record(rr_file_list, &directory_table, type);
+      /* Create index of parent directory data */
+      if (parent_index[rr_file_list->dir_id - 1] == NULL)
+         parent_index[rr_file_list->dir_id - 1] = rr_file_list;
+         
+      bytes_written = construct_dir_record(rr_file_list, parent_index, &directory_table, type);
       
       /*
        * Search whole file list from beginning
@@ -512,7 +529,7 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
             
             type = (rock_ridge_on == TRUE) ? RRIP : ISO9660;
             
-            entry_len = construct_dir_record(tmp_file_list, &directory_table, type);
+            entry_len = construct_dir_record(tmp_file_list, NULL, &directory_table, type);
             bytes_written += entry_len;
             
              /* Create CE record if needed */
@@ -559,6 +576,7 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
                bytes_written -= entry_len;
                directory_table += tmp_file_list->ISO9660_len;
                bytes_written += tmp_file_list->ISO9660_len;
+               entry_len = tmp_file_list->ISO9660_len;
                
                tmp_file_list->CE_offset = CE_offset;
                CE_offset += (tmp_file_list->full_len - tmp_file_list->ISO9660_len);
@@ -594,8 +612,13 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
    /* Write files */
    rv = write_files(file_list, dest);
 
-   free(directory_table_start);
-   free(NM);
+cleanup:
+   if (directory_table_start != NULL)
+      free(directory_table_start);
+   if (NM != NULL)
+      free(NM);
+   if (parent_index != NULL)
+      free(parent_index);   
    
    return rv;
 }
@@ -609,9 +632,11 @@ uint8_t do_pad(uint8_t len, enum pad_list_t type) {
    return pad_len;
 }
 
-static uint32_t construct_dir_record(struct file_list_t *file_list, void **directory_table_output, enum segment_list_t type) {
+static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_list_t **parent_index, void **directory_table_output, enum segment_list_t type) {
    struct file_list_t *rr_file_list = file_list;
+   struct file_list_t *parent = NULL;
    struct tm *ts = NULL;
+   struct iso9660_data_t iso9660_data;
    void *rr_directory_table = *directory_table_output;
    void *rr_directory_table_start = rr_directory_table;
    void *rr_save_ptr = NULL;
@@ -621,24 +646,21 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
    char cdate_time[7];
    int terminator_len = 0;
    int rr_save_size = 0;
-   int iso9660_original_size = 0;
-   uint64_t data_len = 0;
-   uint64_t LBA = 0;
    uint64_t mode = get_int32_LSB_MSB(rr_file_list->st_mode);
    uint64_t nlinks = get_int32_LSB_MSB(rr_file_list->st_nlink);
    uint64_t uid = get_int32_LSB_MSB(rr_file_list->st_uid);
    uint64_t gid = get_int32_LSB_MSB(rr_file_list->st_gid);
    uint64_t ino = get_int32_LSB_MSB(rr_file_list->st_ino);
    uint32_t directory_table_size = 0;
-   uint32_t volume_seq_number = get_int16_LSB_MSB(one);
-   uint8_t name_len = 0;
-   uint8_t ext_attr_record = 0;
-   uint8_t flags = 0;                                                // Will be adjusted in future, 0x02 indicates directory
    uint8_t pad_len = 0;
    
    memset(mdate_time, 0, sizeof(mdate_time));
    memset(adate_time, 0, sizeof(adate_time));
    memset(cdate_time, 0, sizeof(cdate_time));
+   memset(&iso9660_data, 0, sizeof(iso9660_data_t));
+   
+   iso9660_data.volume_seq_number = get_int16_LSB_MSB(one);
+   iso9660_data.ext_attr_record = 0;
    
    /* Assign modify date/time values */
    ts = localtime(&file_list->mtime);
@@ -670,42 +692,35 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
    cdate_time[5] = ts->tm_sec;
    cdate_time[6] = ts->tm_gmtoff / 60 / 15;
    
-   LBA = get_int32_LSB_MSB(rr_file_list->LBA);
+   iso9660_data.LBA = get_int32_LSB_MSB(rr_file_list->LBA);
+   strncpy(iso9660_data.mdate_time, mdate_time, sizeof(iso9660_data.mdate_time));
    pad_len = do_pad(rr_file_list->name_conv_len, PAD_EVEN);
    
    if (S_ISDIR(rr_file_list->st_mode)) {
-      flags = 0x02;
       terminator_len = 0;
-      data_len = get_int32_LSB_MSB(rr_file_list->blocks * BLOCK_SIZE);
+      iso9660_data.data_len = get_int32_LSB_MSB(rr_file_list->blocks * BLOCK_SIZE);
+      iso9660_data.flags = 0x02;
    }
    else {
-      flags = 0x00;
       terminator_len = 2;
-      data_len = get_int32_LSB_MSB(rr_file_list->size);
+      iso9660_data.data_len = get_int32_LSB_MSB(rr_file_list->size);
+      iso9660_data.flags = 0x00;
    }
    
    if (type == ISO9660_ROOT || type == ROOT_HEADER || type == RRIP_ROOT) {
-      name_len = 1;                                                                                   // Lenght of roor dir name is always 1
       pad_len = 0;
+      iso9660_data.name_len = 1;                                                                        // Lenght of roor dir name is always 1
    }
-   else
-      name_len = rr_file_list->name_conv_len + terminator_len;
+   else {
+      iso9660_data.name_len = rr_file_list->name_conv_len + terminator_len;
+   }
    
    /* Create basic ISO9660 structure */
-   iso9660_cp2heap(&rr_directory_table, &zero, sizeof(uint8_t), &directory_table_size);               // Lenght of whole entry will be added at the end
-   iso9660_cp2heap(&rr_directory_table, &ext_attr_record, sizeof(uint8_t), &directory_table_size);    // Ext. attr. record
-   iso9660_cp2heap(&rr_directory_table, &LBA, sizeof(uint64_t), &directory_table_size);               // LBA
-   iso9660_cp2heap(&rr_directory_table, &data_len, sizeof(uint64_t), &directory_table_size);          // Size of file/dir
-   iso9660_cp2heap(&rr_directory_table, mdate_time, sizeof(mdate_time), &directory_table_size);       // Recording date/time
-   iso9660_cp2heap(&rr_directory_table, &flags, sizeof(uint8_t), &directory_table_size);              // Flags
-   iso9660_cp2heap(&rr_directory_table, &zero, sizeof(uint8_t), &directory_table_size);               // Interleaving
-   iso9660_cp2heap(&rr_directory_table, &zero, sizeof(uint8_t), &directory_table_size);               // Interleaving
-   iso9660_cp2heap(&rr_directory_table, &volume_seq_number, sizeof(uint32_t), &directory_table_size); // Volume sequence number
-   iso9660_cp2heap(&rr_directory_table, &name_len, sizeof(uint8_t), &directory_table_size);           // File name len
+   construct_iso9660_record(&rr_directory_table, iso9660_data, &directory_table_size);
    
    /* Add file name */
    if (type == ISO9660_ROOT || type == ROOT_HEADER || type == RRIP_ROOT)
-      iso9660_cp2heap(&rr_directory_table, &zero, name_len, &directory_table_size);
+      iso9660_cp2heap(&rr_directory_table, &zero, iso9660_data.name_len, &directory_table_size);
    else
       iso9660_cp2heap(&rr_directory_table, rr_file_list->name_conv, rr_file_list->name_conv_len, &directory_table_size);
 
@@ -717,22 +732,35 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
    if (pad_len == 1)
       iso9660_cp2heap(&rr_directory_table, &zero, pad_len, &directory_table_size);
    
-   /* Save size of iso9660 basic entry */
-   iso9660_original_size = directory_table_size;
-   
    /* This one is called only during header creation */
    if (type == ROOT_HEADER) {
       iso9660_cp2heap(&rr_directory_table_start, &directory_table_size, sizeof(uint8_t), NULL);
    }
-   /* Create root dir entry one more time, with name 0x01 ... */
+   
+   /* Add record for directory '..' */
    else if (type == ISO9660_ROOT) {
-      iso9660_cp2heap(&rr_directory_table_start, &directory_table_size, sizeof(uint8_t), NULL);
+      parent = parent_index[rr_file_list->parent_id - 1];
       
+      iso9660_cp2heap(&rr_directory_table_start, &directory_table_size, sizeof(uint8_t), NULL);         // Write size of '.'
       rr_save_ptr = rr_directory_table;
       rr_save_size = directory_table_size;
       
-      iso9660_cp2heap(&rr_directory_table, rr_directory_table_start, iso9660_original_size - 1, &directory_table_size);
-      iso9660_cp2heap(&rr_directory_table, &one, sizeof(uint8_t), &directory_table_size);
+      /* Assign modify date/time values */
+      ts = localtime(&parent->mtime);
+      mdate_time[0] = ts->tm_year;
+      mdate_time[1] = ts->tm_mon + 1;
+      mdate_time[2] = ts->tm_mday;
+      mdate_time[3] = ts->tm_hour;
+      mdate_time[4] = ts->tm_min;
+      mdate_time[5] = ts->tm_sec;
+      mdate_time[6] = ts->tm_gmtoff / 60 / 15;
+      
+      iso9660_data.LBA = get_int32_LSB_MSB(parent->LBA);
+      iso9660_data.data_len = get_int32_LSB_MSB(parent->blocks * BLOCK_SIZE);
+      strncpy(iso9660_data.mdate_time, mdate_time, sizeof(iso9660_data.mdate_time));
+      
+      construct_iso9660_record(&rr_directory_table, iso9660_data, &directory_table_size);
+      iso9660_cp2heap(&rr_directory_table, &one, iso9660_data.name_len, &directory_table_size);
       
       rr_save_size = directory_table_size - rr_save_size;
       iso9660_cp2heap(&rr_save_ptr, &rr_save_size, sizeof(uint8_t), NULL);
@@ -750,6 +778,7 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
       if ((init_fields & rrip_TF) != 0)
          RR[4] |= 1 << 7;                 // TF record in use
       
+      /* Record directory '.' */   
       if (type == RRIP_ABS_ROOT) {
          void *rr_CE = CE + 4;
          uint64_t CE_size = get_int32_LSB_MSB(rr_file_list->CE_LBA);
@@ -763,11 +792,11 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
          iso9660_cp2heap(&rr_directory_table, CE, sizeof(CE), &directory_table_size);
       }
       
-      /* Write RR record*/
+      /* Add RR record*/
       if ((init_fields & rrip_RR) != 0)
          iso9660_cp2heap(&rr_directory_table, RR, sizeof(RR), &directory_table_size);
       
-      /* Write PX record */
+      /* Add PX record */
       if ((init_fields & rrip_PX) != 0) {
          iso9660_cp2heap(&rr_directory_table, PX, 4, &directory_table_size);
          iso9660_cp2heap(&rr_directory_table, &mode, sizeof(mode), &directory_table_size);
@@ -777,7 +806,7 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
          iso9660_cp2heap(&rr_directory_table, &ino, sizeof(ino), &directory_table_size);
       }
       
-      /* Write TF record */
+      /* Add TF record */
       if ((init_fields & rrip_TF) != 0) {
          iso9660_cp2heap(&rr_directory_table, TF, 5, &directory_table_size);
          iso9660_cp2heap(&rr_directory_table, mdate_time, sizeof(mdate_time), &directory_table_size);       // Modify date/time
@@ -795,19 +824,58 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
       rr_save_size = directory_table_size;
       rr_save_ptr = rr_directory_table;
       
-      /* 
-       * RECORD 2
-       * All the circus one more time, this time with '1' 
-       */   
-      iso9660_cp2heap(&rr_directory_table, rr_directory_table_start, iso9660_original_size - 1, &directory_table_size);
-      iso9660_cp2heap(&rr_directory_table, &one, sizeof(uint8_t), &directory_table_size);
+      /* Add record for directory '..' */
+      parent = parent_index[rr_file_list->parent_id - 1];
       
+      /* Assign modify date/time values */
+      ts = localtime(&parent->mtime);
+      mdate_time[0] = ts->tm_year;
+      mdate_time[1] = ts->tm_mon + 1;
+      mdate_time[2] = ts->tm_mday;
+      mdate_time[3] = ts->tm_hour;
+      mdate_time[4] = ts->tm_min;
+      mdate_time[5] = ts->tm_sec;
+      mdate_time[6] = ts->tm_gmtoff / 60 / 15;
+      
+      /* Assign access date/time values */
+      ts = localtime(&parent->atime);
+      adate_time[0] = ts->tm_year;
+      adate_time[1] = ts->tm_mon + 1;
+      adate_time[2] = ts->tm_mday;
+      adate_time[3] = ts->tm_hour;
+      adate_time[4] = ts->tm_min;
+      adate_time[5] = ts->tm_sec;
+      adate_time[6] = ts->tm_gmtoff / 60 / 15;
+      
+      /* Assign status change date/time values */
+      ts = localtime(&parent->ctime);
+      cdate_time[0] = ts->tm_year;
+      cdate_time[1] = ts->tm_mon + 1;
+      cdate_time[2] = ts->tm_mday;
+      cdate_time[3] = ts->tm_hour;
+      cdate_time[4] = ts->tm_min;
+      cdate_time[5] = ts->tm_sec;
+      cdate_time[6] = ts->tm_gmtoff / 60 / 15;
+      
+      iso9660_data.LBA = get_int32_LSB_MSB(parent->LBA);
+      iso9660_data.data_len = get_int32_LSB_MSB(parent->blocks * BLOCK_SIZE);
+      strncpy(iso9660_data.mdate_time, mdate_time, sizeof(iso9660_data.mdate_time));
+      
+      construct_iso9660_record(&rr_directory_table, iso9660_data, &directory_table_size);
+      iso9660_cp2heap(&rr_directory_table, &one, iso9660_data.name_len, &directory_table_size);                            // File name len
+      
+      /* Add RR record */
       if ((init_fields & rrip_RR) != 0)
          iso9660_cp2heap(&rr_directory_table, RR, sizeof(RR), &directory_table_size);
       
-      /* Write PX record */
+      /* Add PX record */
       if ((init_fields & rrip_PX) != 0) {
-         RR[4] |= 1 << 0;  // PX record in use
+         mode = get_int32_LSB_MSB(parent->st_mode);
+         nlinks = get_int32_LSB_MSB(parent->st_nlink);
+         uid = get_int32_LSB_MSB(parent->st_uid);
+         gid = get_int32_LSB_MSB(parent->st_gid);
+         ino = get_int32_LSB_MSB(parent->st_ino);
+         
          iso9660_cp2heap(&rr_directory_table, PX, 4, &directory_table_size);
          iso9660_cp2heap(&rr_directory_table, &mode, sizeof(mode), &directory_table_size);
          iso9660_cp2heap(&rr_directory_table, &nlinks, sizeof(nlinks), &directory_table_size);
@@ -816,15 +884,15 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
          iso9660_cp2heap(&rr_directory_table, &ino, sizeof(ino), &directory_table_size);
       }
       
-      /* Write TF record */
+      /* Add TF record */
       if ((init_fields & rrip_TF) != 0) {
-         RR[4] |= 1 << 7;  // TF record in use
          iso9660_cp2heap(&rr_directory_table, TF, 5, &directory_table_size);
          iso9660_cp2heap(&rr_directory_table, mdate_time, sizeof(mdate_time), &directory_table_size);       // Modify date/time
          iso9660_cp2heap(&rr_directory_table, adate_time, sizeof(adate_time), &directory_table_size);       // Access date/time
          iso9660_cp2heap(&rr_directory_table, cdate_time, sizeof(cdate_time), &directory_table_size);       // status change date/time
       }
       
+      /* Do padding if needed */
       if (directory_table_size % 2 == 1)
          iso9660_cp2heap(&rr_directory_table, &zero, 1, &directory_table_size);
       
@@ -839,21 +907,21 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
       
       if ((init_fields & rrip_PX) != 0)
          RR[4] |= 1 << 0;                 // PX record in use
-      if ((init_fields & rrip_NM) != 0)
-         RR[4] |= 1 << 3;                 // NM record in use
       if ((init_fields & rrip_TF) != 0)
          RR[4] |= 1 << 7;                 // TF record in use
+      if ((init_fields & rrip_NM) != 0) {
+         RR[4] |= 1 << 3;                 // NM record in use
+         memset(NM + 5, 0, BLOCK_SIZE - 5);
       
-      memset(NM + 5, 0, BLOCK_SIZE - 5);
-      
-      /* Prepare for another possible NM entry */
-      if (rr_file_list->name_short_len >= 250) {
-         rest = rr_file_list->name_short_len - 250;
-         rr_file_list->name_short_len = 250;
+         /* Prepare for another possible NM entry */
+         if (rr_file_list->name_short_len >= 250) {
+            rest = rr_file_list->name_short_len - 250;
+            rr_file_list->name_short_len = 250;
+         }
+         
+         NM[2] = 5 + rr_file_list->name_short_len;
+         strncpy((char *)NM + 5, rr_file_list->name_short, rr_file_list->name_short_len);
       }
-      
-      NM[2] = 5 + rr_file_list->name_short_len;
-      strncpy((char *)NM + 5, rr_file_list->name_short, rr_file_list->name_short_len);
       
       if ((init_fields & rrip_RR) != 0)
          iso9660_cp2heap(&rr_directory_table, RR, sizeof(RR), &directory_table_size);
@@ -903,6 +971,22 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, void **direc
    *directory_table_output = rr_directory_table;
    
    return directory_table_size;
+}
+
+static int construct_iso9660_record(void **output, struct iso9660_data_t data, uint32_t *size) {
+   
+   iso9660_cp2heap(output, &zero, sizeof(uint8_t), size);                    // Lenght of whole entry will be added at the end
+   iso9660_cp2heap(output, &data.ext_attr_record, sizeof(uint8_t), size);    // Ext. attr. record
+   iso9660_cp2heap(output, &data.LBA, sizeof(uint64_t), size);               // LBA
+   iso9660_cp2heap(output, &data.data_len, sizeof(uint64_t), size);          // Size of file/dir
+   iso9660_cp2heap(output, &data.mdate_time, sizeof(data.mdate_time), size); // Recording date/time
+   iso9660_cp2heap(output, &data.flags, sizeof(uint8_t), size);              // Flags
+   iso9660_cp2heap(output, &zero, sizeof(uint8_t), size);                    // Interleaving
+   iso9660_cp2heap(output, &zero, sizeof(uint8_t), size);                    // Interleaving
+   iso9660_cp2heap(output, &data.volume_seq_number, sizeof(uint32_t), size); // Volume sequence number
+   iso9660_cp2heap(output, &data.name_len, sizeof(uint8_t), size);           // File name len
+   
+   return E_OK;
 }
 
 static int blocks_count(int size) {
@@ -1085,4 +1169,3 @@ static void shift_mem(void *var, int offset, int ammount) {
 static uint8_t set_terminator_len(mode_t mode) {
    return (S_ISDIR(mode)) ? 0 : 2;
 }
-

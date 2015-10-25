@@ -1,9 +1,9 @@
 /*
  * ebiso.c
  * 
- * Version:       0.1.3
+ * Version:       0.1.4
  * 
- * Release date:  21.10.2015
+ * Release date:  25.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -129,6 +129,7 @@ int main(int argc, char *argv[]) {
    list->dir_id = 1;
    list->parent_id = 1;
    list->next = (struct file_list_t*) malloc(sizeof(struct file_list_t));
+   ISO_data.dir_count = 1;
    rr_list = list->next;
    memset(rr_list, 0, sizeof(struct file_list_t));
    
@@ -162,7 +163,7 @@ int main(int argc, char *argv[]) {
    }
    
    /* Create initial file structure */
-   if ((rv = list_create(ISO_data.work_dir, &rr_list)) != E_OK)
+   if ((rv = list_create(ISO_data.work_dir, &rr_list, &ISO_data)) != E_OK)
       goto cleanup;
    
    /* Remove possible duplicates */
@@ -233,11 +234,16 @@ int main(int argc, char *argv[]) {
 cleanup:
    
    list_clean(list);
-   free(terminator);
-   free(path_table_LSB);
-   free(path_table_MSB);
-   free(header);
-   free(boot_descriptor);
+   if (terminator != NULL)
+      free(terminator);
+   if (path_table_LSB != NULL)
+      free(path_table_LSB);
+   if (path_table_MSB != NULL)
+      free(path_table_MSB);
+   if (header != NULL)
+      free(header);
+   if (boot_descriptor != NULL)
+      free(boot_descriptor);
    
    return rv;
 }

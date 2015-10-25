@@ -1,9 +1,9 @@
 /*
  * list.c
  * 
- * Version:       0.1.1
+ * Version:       0.1.2
  * 
- * Release date:  20.09.2015
+ * Release date:  25.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -29,7 +29,7 @@
 #include <dirent.h>
 #include <errno.h>
 
-int list_create(const char *dirname, struct file_list_t **flist) {
+int list_create(const char *dirname, struct file_list_t **flist, struct ISO_data_t *ISO_data) {
    FILE *read_test = NULL;
    DIR *cur_dir = NULL;
    struct dirent *dir_content = NULL;
@@ -41,7 +41,7 @@ int list_create(const char *dirname, struct file_list_t **flist) {
    static int level = 0;
    int rr_dir = 0;
    int path_len = 0;
-   int rv = 0;
+   int rv = E_OK;
    
    memset(tmp_conv, 0, sizeof(tmp_conv));
    
@@ -108,13 +108,14 @@ int list_create(const char *dirname, struct file_list_t **flist) {
       }
       
       /* Recursion to child directory */
-      if ( !(dir_content->d_type ^ DT_DIR) && (rv == 0) ) {
+      if ( !(dir_content->d_type ^ DT_DIR) && (rv == E_OK) ) {
          rr_dir = parent_id;
          parent_id = dir_id;
          
-         rv = list_create(path, flist);
+         rv = list_create(path, flist, ISO_data);
          
          parent_id = rr_dir;
+         ISO_data->dir_count++;
       }
    }
    
@@ -140,7 +141,7 @@ void list_clean(struct file_list_t *list_to_clean) {
    free(list_to_clean);
 }
 
-struct file_list_t *list_search(struct file_list_t *file_list, char *needle) {
+struct file_list_t *list_search_name(struct file_list_t *file_list, char *needle) {
    struct file_list_t *rv = NULL;
    size_t needle_len = strlen(needle);
    
@@ -161,4 +162,3 @@ struct file_list_t *list_search(struct file_list_t *file_list, char *needle) {
    
    return rv;
 }
-

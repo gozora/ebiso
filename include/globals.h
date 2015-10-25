@@ -1,9 +1,9 @@
 /*
  * globals.h
  * 
- * Version:       0.4.0
+ * Version:       0.4.1
  * 
- * Release date:  20.10.2015
+ * Release date:  25.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -44,8 +44,9 @@
 #define PT_RECORD_LEN 0x8
 #define ARR_PREALLOC 20
 #define RRIP_INIT_FIELDS rrip_RR | rrip_PX | rrip_TF | rrip_NM
-//#define RRIP_INIT_FIELDS rrip_RR | rrip_PX | rrip_TF
+//#define RRIP_INIT_FIELDS rrip_RR
 //#define RRIP_INIT_FIELDS rrip_NM
+//#define RRIP_INIT_FIELDS rrip_TF | rrip_PX
 
 #define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 

@@ -1,9 +1,9 @@
 /*
  * ebiso.h
  * 
- * Version:       0.1.3
+ * Version:       0.1.4
  * 
- * Release date:  21.10.2015
+ * Release date:  25.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -33,7 +33,7 @@
 #include <getopt.h>
 
 #define PROGNAME "ebiso"
-#define VERSION "0.1.3"
+#define VERSION "0.1.4"
 
 #ifdef DEBUG
 static void disp_level(struct file_list_t *list_to_display, int level);
@@ -57,7 +57,7 @@ enum msg_l {
 
 extern void filename_rename_duplicates(struct file_list_t *list);
 
-extern int list_create(const char *dirname, struct file_list_t **flist);
+extern int list_create(const char *dirname, struct file_list_t **flist, struct ISO_data_t *ISO_data);
 extern void list_clean(struct file_list_t *list_to_clean);
 
 extern uint32_t iso9660_header(void **header, struct file_list_t file_list, struct ISO_data_t ISO_data);

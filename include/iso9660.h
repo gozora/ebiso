@@ -1,9 +1,9 @@
 /*
  * iso9660.h
  * 
- * Version:       0.2.0
+ * Version:       0.2.1
  * 
- * Release date:  20.10.2015
+ * Release date:  25.10.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -47,9 +47,19 @@ enum rrip_fields_t {
    rrip_NM = 1 << 4
 } rrip_fields_t;
 
+struct iso9660_data_t {
+   char mdate_time[7];
+   uint64_t LBA;
+   uint64_t data_len;
+   uint32_t volume_seq_number;
+   uint8_t flags;
+   uint8_t name_len;
+   uint8_t ext_attr_record;
+} iso9660_data_t;
+
 extern int option_on_off(uint32_t option2check, enum opt_l option);
 extern int write_files(struct file_list_t *file_list, FILE *dest);
-extern struct file_list_t *list_search(struct file_list_t *file_list, char *needle);
+extern struct file_list_t *list_search_name(struct file_list_t *file_list, char *needle);
 extern int CE_assign_LBA(struct CE_list_t *CE_list, struct file_list_t *file_list, uint32_t *LBA);
 extern int CEarr_init_list(struct CE_list_t *CE_list, int arr_prealloc);
 extern void CEarr_destroy_list(struct CE_list_t *CE_list);
@@ -65,7 +75,8 @@ uint8_t do_pad(uint8_t len, enum pad_list_t type);
 /* el_torito.c */
 void iso9660_cp2heap(void **dest, const void *source, long int size, uint32_t *dest_size);
 
-static uint32_t construct_dir_record(struct file_list_t *file_list, void **directory_table_output, enum segment_list_t type);
+static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_list_t **parent_index, void **directory_table_output, enum segment_list_t type);
+static int construct_iso9660_record(void **output, struct iso9660_data_t data, uint32_t *size);
 static uint64_t get_int32_LSB_MSB(uint64_t input);
 static uint32_t get_int16_LSB_MSB(uint32_t input);
 static int blocks_count(int size);

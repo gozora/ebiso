@@ -1,9 +1,9 @@
 /*
  * list.h
  * 
- * Version:       0.1.1
+ * Version:       0.1.2
  * 
- * Release date:  20.09.2015
+ * Release date:  25.09.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -30,9 +30,8 @@
 extern uint8_t filename_convert_name(char *input, char *output, enum conv_type_l type);
 
 /* ebiso.c */
-int list_create(const char *dirname, struct file_list_t **flist);
+int list_create(const char *dirname, struct file_list_t **flist, struct ISO_data_t *ISO_data);
 void list_clean(struct file_list_t *list_to_clean);
 
 /* iso9660.c */
-struct file_list_t *list_search(struct file_list_t *file_list, char *needle);
-
+struct file_list_t *list_search_name(struct file_list_t *file_list, char *needle);
