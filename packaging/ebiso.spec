@@ -13,7 +13,7 @@ Release:		1%{?rpmrelease}%{?dist}
 Summary:		UEFI bootable ISO image creator
 License:		GPLv3
 
-Group:			Productivity/Multimedia/CD/Record
+Group:			Applications/System
 URL:			https://github.com/gozora/ebiso
 Source:			%{name}-%{version}.tar.gz
 Vendor:			Vladimir (sodoma) Gozora
@@ -42,8 +42,6 @@ UEFI bootable ISO image creator
 %defattr(-,root,root,0755)
 %{bindir}/ebiso
 
-%post
-%postun
 
 %changelog
 * Wed Oct 21 2015 Gratien D'haese <gratien.dhaese@gmail.com>
