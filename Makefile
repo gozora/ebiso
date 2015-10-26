@@ -5,6 +5,7 @@
 CC=gcc
 LIBDIR=lib
 INCLUDEDIR=./include
+DESTDIR=
 INSTDIR=/usr/bin
 PROGNAME=ebiso
 
@@ -51,11 +52,11 @@ ${PROGNAME}: ${OBJ} ${PROGNAME}.c ${HEADERS}
 dist: 
 	@echo -e "\033[1m== Creating tar archive $(PROGNAME)-$(distversion).tar.gz ==\033[0;0m"
 	make clean
-	tar czf ../$(PROGNAME)-$(distversion).tar.gz --transform='s,^$(PROGNAME),$(PROGNAME)-$(distversion),S' \
+	tar czf ../$(PROGNAME)-$(distversion).tar.gz \
 	--exclude=.git \
 	--exclude=.gitignore \
 	--exclude=README.md \
-	-C .. $(PROGNAME)
+	--transform='s,^\./,ebiso-0.1.1/,S' .
 	@mv ../$(PROGNAME)-$(distversion).tar.gz ./
 
 .PHONY: clean
@@ -77,10 +78,11 @@ rpm: dist $(specfile)
 .PHONY: install
 install: ${PROGNAME}
 	@echo -e "\033[1m== Installing $(PROGNAME)-$(distversion) ==\033[0;0m"
-	install -m 0755 ${PROGNAME} ${INSTDIR}
+	[ ! -d $(DESTDIR)$(INSTDIR) ] && mkdir -m 755 -p $(DESTDIR)$(INSTDIR)
+	install -m 0755 ${PROGNAME} $(DESTDIR)$(INSTDIR)
 
 .PHONY: uninstall
 uninstall:
-	-rm ${INSTDIR}/${PROGNAME}
+	-rm $(DESTDIR)$(INSTDIR)/${PROGNAME}
 
 -include $(patsubst %,$(BASE_DEPDIR)/%.d,$(basename $(SRC)))
