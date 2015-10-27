@@ -8,7 +8,7 @@
 %endif
 
 Name:			ebiso
-Version:		0.1.1
+Version:		0.1.4
 Release:		1%{?rpmrelease}%{?dist}
 Summary:		UEFI bootable ISO image creator
 License:		GPLv3

@@ -49,22 +49,36 @@ ${PROGNAME}: ${OBJ} ${PROGNAME}.c ${HEADERS}
 	${CC} ${FLAGS} -o ${PROGNAME} ${PROGNAME}.c ${LIBS}
 
 .PHONY: dist
-dist: 
+dist: clean rewrite $(PROGNAME)-$(distversion).tar.gz restore
+
+.PHONY: $(PROGNAME)-$(distversion).tar.gz
+$(PROGNAME)-$(distversion).tar.gz:
 	@echo -e "\033[1m== Creating tar archive $(PROGNAME)-$(distversion).tar.gz ==\033[0;0m"
-	make clean
 	tar czf ../$(PROGNAME)-$(distversion).tar.gz \
 	--exclude=.git \
 	--exclude=.gitignore \
 	--exclude=README.md \
-	--transform='s,^\./,ebiso-0.1.1/,S' .
+	--transform='s,^\./,ebiso-$(distversion)/,S' .
 	@mv ../$(PROGNAME)-$(distversion).tar.gz ./
 
 .PHONY: clean
 clean:
+	@echo -e "\033[1m== Cleaning up ==\033[0;0m"
 	rm -f ${LIBDIR}/*.o ${LIBDIR}/*.a
-	rm -f ${PROGNAME}
+	rm -f $(PROGNAME)
 	rm -f $(PROGNAME)*.tar.gz
+	rm -f $(PROGNAME)*.rpm
 	rm -rf ${BASE_DEPDIR}
+
+.PHONY: rewrite
+rewrite: 
+	@echo -e "\033[1m== Rewriting $(specfile) (updating version) ==\033[0;0m"
+	sed -i.orig -e 's#^Version:.*#Version:\t\t$(distversion)#' $(specfile)
+
+.PHONY: restore
+restore:
+	@echo -e "\033[1m== Restore original $(specfile) ==\033[0;0m"
+	mv -f $(specfile).orig $(specfile)
 
 .PHONY: rpm
 rpm: dist $(specfile)
@@ -78,8 +92,9 @@ rpm: dist $(specfile)
 .PHONY: install
 install: ${PROGNAME}
 	@echo -e "\033[1m== Installing $(PROGNAME)-$(distversion) ==\033[0;0m"
-	[ ! -d $(DESTDIR)$(INSTDIR) ] && mkdir -m 755 -p $(DESTDIR)$(INSTDIR)
+	if [ ! -d $(DESTDIR)$(INSTDIR) ]; then mkdir -m 755 -p $(DESTDIR)$(INSTDIR); fi
 	install -m 0755 ${PROGNAME} $(DESTDIR)$(INSTDIR)
+	strip $(DESTDIR)$(INSTDIR)/$(PROGNAME)
 
 .PHONY: uninstall
 uninstall:
