@@ -17,6 +17,7 @@ POSTCOMPILE=mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d
 
 LIBS=-L${LIBDIR} -lmain -lm
 MAIN_LIB=${LIBDIR}/libmain.a
+MANDIR=/usr/share/man
 
 FLAGS=-g3 -m64 -std=gnu9x -Wall -Wshadow -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -I${INCLUDEDIR}
 VERSION=$(shell grep "\#define VERSION" ${INCLUDEDIR}/${PROGNAME}.h | awk '{ print $$NF }' | sed s/\"//g)
@@ -58,7 +59,7 @@ $(PROGNAME)-$(distversion).tar.gz:
 	--exclude=.git \
 	--exclude=.gitignore \
 	--exclude=README.md \
-	--transform='s,^\./,ebiso-$(distversion)/,S' .
+	--transform='s,^\.,ebiso-$(distversion),S' .
 	@mv ../$(PROGNAME)-$(distversion).tar.gz ./
 
 .PHONY: clean
@@ -94,10 +95,13 @@ install: ${PROGNAME}
 	@echo -e "\033[1m== Installing $(PROGNAME)-$(distversion) ==\033[0;0m"
 	if [ ! -d $(DESTDIR)$(INSTDIR) ]; then mkdir -m 755 -p $(DESTDIR)$(INSTDIR); fi
 	install -m 0755 ${PROGNAME} $(DESTDIR)$(INSTDIR)
+	if [ ! -d $(DESTDIR)${MANDIR}/man1 ]; then mkdir -m 755 -p $(DESTDIR)${MANDIR}/man1; fi
+	install -m 0644 man/man1/$(PROGNAME).1.gz $(DESTDIR)${MANDIR}/man1/
 	strip $(DESTDIR)$(INSTDIR)/$(PROGNAME)
 
 .PHONY: uninstall
 uninstall:
 	-rm $(DESTDIR)$(INSTDIR)/${PROGNAME}
+	-rm $(DESTDIR)${MANDIR}/man1/$(PROGNAME).1.gz
 
 -include $(patsubst %,$(BASE_DEPDIR)/%.d,$(basename $(SRC)))
