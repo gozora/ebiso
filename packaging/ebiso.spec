@@ -22,7 +22,8 @@ BuildRoot:		%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 ExclusiveArch:		x86_64
 
 %description
-UEFI bootable ISO image creator
+ebiso creates bootable ISO images on Linux based systems with
+enabled UEFI boot.
 
 
 %prep
@@ -44,5 +45,7 @@ UEFI bootable ISO image creator
 
 
 %changelog
-* Wed Oct 21 2015 Gratien D'haese <gratien.dhaese@gmail.com>
+* Tue Oct 27 2015 Vladimir Gozora <c@gozora.sk> 0.1.4-0.1
+  Updated description
+* Wed Oct 21 2015 Gratien D'haese <gratien.dhaese@gmail.com> 0.1.4-0.1
   Rewrote original spec file from Vladimir
