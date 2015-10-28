@@ -42,13 +42,11 @@ enabled UEFI boot.
 
 %files
 %defattr(-,root,root,0755)
-%{bindir}/ebiso
-%{mandir}/man1/ebiso.1.gz
+%{bindir}/%{name}
+%{mandir}/man1/%{name}.1.gz
 
 %changelog
-* Tue Oct 27 2015 Vladimir Gozora <c@gozora.sk> 0.1.4-0.1
+* Tue Oct 27 2015 Vladimir Gozora <c@gozora.sk> - 0.1.4-%{release}
   Added man pages to package
-* Tue Oct 27 2015 Vladimir Gozora <c@gozora.sk> 0.1.4-0.1
-  Updated description
-* Wed Oct 21 2015 Gratien D'haese <gratien.dhaese@gmail.com> 0.1.4-0.1
+* Wed Oct 21 2015 Gratien D'haese <gratien.dhaese@gmail.com> - 0.1.1-%{release}
   Rewrote original spec file from Vladimir
