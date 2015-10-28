@@ -58,7 +58,7 @@ $(PROGNAME)-$(distversion).tar.gz:
 	--exclude=.git \
 	--exclude=.gitignore \
 	--exclude=README.md \
-	--transform='s,^\./,ebiso-$(distversion)/,S' .
+	--transform='s,^\.,ebiso-$(distversion)/,S' .
 	@mv ../$(PROGNAME)-$(distversion).tar.gz ./
 
 .PHONY: clean
