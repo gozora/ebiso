@@ -1,9 +1,9 @@
 /*
  * ebiso.h
  * 
- * Version:       0.1.4
+ * Version:       0.2.0
  * 
- * Release date:  25.10.2015
+ * Release date:  13.11.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -33,7 +33,7 @@
 #include <getopt.h>
 
 #define PROGNAME "ebiso"
-#define VERSION "0.1.4"
+#define VERSION "0.2.0"
 
 #ifdef DEBUG
 static void disp_level(struct file_list_t *list_to_display, int level);
@@ -70,7 +70,7 @@ extern uint8_t do_pad(uint8_t len, enum pad_list_t type);
 extern void et_boot_record_descr(void **boot_record_descriptor, struct ISO_data_t ISO_data);
 extern int et_boot_catalog(struct ISO_data_t LBA_data);
 
-/* iso9660.c */
+/* iso9660.c list.c */
 int option_on_off(uint32_t option2check, enum opt_l option);
 
 static int set_option(uint32_t *opt2set, enum opt_l option);

@@ -1,9 +1,9 @@
 /*
  * write_files.c
  * 
- * Version:       0.0.4
+ * Version:       0.2.0
  * 
- * Release date:  20.10.2015
+ * Release date:  13.11.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -36,8 +36,8 @@ int write_files(struct file_list_t *file_list, FILE *dest) {
    memset(buffer, 0, sizeof(buffer));
    
    while(rr_file_list->next != NULL) {
-      /* Skip directories */
-      if (S_ISDIR(rr_file_list->st_mode)) {
+      /* Skip directories and symlinks */
+      if (S_ISDIR(rr_file_list->st_mode) || S_ISLNK(rr_file_list->st_mode)) {
          rr_file_list = rr_file_list->next;
          continue;
       }

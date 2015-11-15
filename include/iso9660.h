@@ -1,9 +1,9 @@
 /*
  * iso9660.h
  * 
- * Version:       0.2.1
+ * Version:       0.3.0
  * 
- * Release date:  25.10.2015
+ * Release date:  15.11.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -63,6 +63,7 @@ extern struct file_list_t *list_search_name(struct file_list_t *file_list, char 
 extern int CE_assign_LBA(struct CE_list_t *CE_list, struct file_list_t *file_list, uint32_t *LBA);
 extern int CEarr_init_list(struct CE_list_t *CE_list, int arr_prealloc);
 extern void CEarr_destroy_list(struct CE_list_t *CE_list);
+extern int SL_create(char *input, unsigned char **output);
 
 /* ebiso.c */
 uint32_t iso9660_terminator(void **terminator);

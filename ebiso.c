@@ -1,9 +1,9 @@
 /*
  * ebiso.c
  * 
- * Version:       0.1.4
+ * Version:       0.2.0
  * 
- * Release date:  25.10.2015
+ * Release date:  15.11.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -260,6 +260,9 @@ static void disp_level(struct file_list_t *list_to_display, int level) {
             flag = 'D';
          else
             flag = 'F';
+         
+         if (S_ISLNK(list_to_display->st_mode))
+            flag = 'L';
          
          ts = localtime(&list_to_display->mtime);
          strftime(buff, sizeof(buff), "%a %Y-%m-%d %H:%M:%S %Z", ts);

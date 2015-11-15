@@ -1,9 +1,9 @@
 /*
  * globals.h
  * 
- * Version:       0.4.1
+ * Version:       0.5.0
  * 
- * Release date:  25.10.2015
+ * Release date:  14.11.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -66,7 +66,8 @@ enum errors_l {
    E_IO,
    E_CONV,
    E_MALLOC,
-   E_NOTSET
+   E_NOTSET,
+   E_LNKFAIL
 } errors_l;
 
 enum endianity_l {

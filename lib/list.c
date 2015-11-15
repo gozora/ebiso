@@ -1,9 +1,9 @@
 /*
  * list.c
  * 
- * Version:       0.1.2
+ * Version:       0.2.0
  * 
- * Release date:  25.09.2015
+ * Release date:  14.11.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -35,15 +35,16 @@ int list_create(const char *dirname, struct file_list_t **flist, struct ISO_data
    struct dirent *dir_content = NULL;
    struct stat dir_cont_stat;
    char path[MAX_DIR_STR_LEN];
-   char tmp_conv[MAX_DIR_STR_LEN];
    static int parent_id = 1;
    static int dir_id = 1;
    static int level = 0;
    int rr_dir = 0;
    int path_len = 0;
    int rv = E_OK;
+   bool_t rock_ridge_on = FALSE;
    
-   memset(tmp_conv, 0, sizeof(tmp_conv));
+   if (option_on_off(ISO_data->options, OPT_R) == E_OK)
+      rock_ridge_on = TRUE;
    
    /* Record/increase current directory level */
    level++;
@@ -74,15 +75,36 @@ int list_create(const char *dirname, struct file_list_t **flist, struct ISO_data
          /* convert filename to 8.3 format */
          (*flist)->name_conv_len = filename_convert_name((*flist)->name_short, (*flist)->name_conv, CONV_ISO9660);
          
-         if ((read_test = fopen(path, "r")) == NULL) {
-            printf("Error: list_create(): Failed to open [%s]: %s\n", path, strerror(errno));
-            rv = E_READFAIL;
-            goto cleanup;
-         }
-         else
-            fclose(read_test);
+         lstat(path, &dir_cont_stat);
          
-         stat(path, &dir_cont_stat);
+         /* 
+          * Dont do read test on symlinks as they dont need to have any real valid content 
+          * If RRIP is not used symlinks will be handled as hardlinks
+          */
+         if (S_ISLNK(dir_cont_stat.st_mode) && rock_ridge_on == TRUE) {
+            memset((*flist)->name_path, 0, MAX_DIR_STR_LEN);
+            if (readlink(path, (*flist)->name_path, MAX_DIR_STR_LEN - 1) == -1) {
+               printf("Error: list_create(): Failed to read link [%s]: %s\n", path, strerror(errno));
+               goto cleanup;
+            }
+         }
+         /* Symlinks will be ignored if RRIP is not in use */
+         else if (S_ISLNK(dir_cont_stat.st_mode) && rock_ridge_on == FALSE) {
+            printf("Warning: list_create(): Symlink will be ignored: [%s]\n", path);
+            memset(*flist, 0, sizeof(struct file_list_t));
+            continue;
+         }
+         /* Do a read test on files and dirs */
+         else {
+            stat(path, &dir_cont_stat);
+            if ((read_test = fopen(path, "r")) == NULL) {
+               printf("Error: list_create(): Failed to open [%s]: %s\n", path, strerror(errno));
+               rv = E_READFAIL;
+               goto cleanup;
+            }
+            else
+               fclose(read_test);
+         }
          
          if (S_ISDIR(dir_cont_stat.st_mode))
             dir_id++;
@@ -98,13 +120,12 @@ int list_create(const char *dirname, struct file_list_t **flist, struct ISO_data
          (*flist)->atime = dir_cont_stat.st_atime;
          (*flist)->ctime = dir_cont_stat.st_ctime;
          (*flist)->dir_id = dir_id;
-         (*flist)->next = (struct file_list_t*) malloc(sizeof(struct file_list_t));
          (*flist)->parent_id = parent_id;
          (*flist)->level = level;
+         (*flist)->next = (struct file_list_t*) malloc(sizeof(struct file_list_t));
          (*flist) = (*flist)->next;
          
          memset(*flist, 0, sizeof(struct file_list_t));
-         memset(tmp_conv, 0, sizeof(tmp_conv));
       }
       
       /* Recursion to child directory */

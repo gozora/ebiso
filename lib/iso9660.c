@@ -1,9 +1,9 @@
 /*
  * iso9660.c
  * 
- * Version:       0.2.2
+ * Version:       0.3.0
  * 
- * Release date:  25.10.2015
+ * Release date:  14.11.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -32,6 +32,7 @@ unsigned char CE[28];
 unsigned char ER[237];
 unsigned char SP[7];
 unsigned char RR[5];
+unsigned char SL[255];              // 1<<2
 unsigned char PX[44];               // 1<<0
 unsigned char TF[26];               // 1<<7
 unsigned char *NM;                  // 1<<3
@@ -241,7 +242,9 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
    int min_dir_len = 2 * (DIR_RECORD_LEN + 1);                       // Directory recod begins with two entries of directory it self
    int additional_bytes = 0;
    int rock_ridge_header_size = 0;
+   int SL_len = 0;
    int rv = E_OK;
+   unsigned char *pSL = SL;
    uint32_t LBA = LBA_ROOT + (2 * ISO_data->path_table_offset);      // Move first LBA if path tables are larger that BLOCK_SIZE
    uint8_t pad_len = 0;
    uint8_t terminator_len = 0;
@@ -306,6 +309,15 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
                if (rock_ridge_on == TRUE) {
                   if ((init_fields & rrip_NM) != 0)
                      additional_bytes = tmp_file_list->name_short_len + 5;
+                  
+                  /* Add potentional length of symlink (SL) record */
+                  if (S_ISLNK(tmp_file_list->st_mode)) {
+                     memset(SL, 0, sizeof(SL));
+                     if ((SL_len = SL_create(tmp_file_list->name_path, &pSL)) < 0)
+                        return E_LNKFAIL;
+                     else
+                        additional_bytes += SL_len;
+                  }
                   
                   dir_rec_len += rock_ridge_header_size + additional_bytes;
                   rr_len += rock_ridge_header_size + additional_bytes;
@@ -439,8 +451,15 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
       && strncmp(rr_file_list->name_path, ISO_data->efi_boot_file_full, strlen(ISO_data->efi_boot_file_full)) ) {
 
          rr_file_list->LBA = LBA;
-         rr_file_list->blocks = blocks_count(rr_file_list->size);
-         LBA = LBA + rr_file_list->blocks;
+         
+         /*
+          * Dont increment LBA for symlink as they dont bear no real content 
+          * Symlink can point to arbitrary LBA
+          */
+         if (!S_ISLNK(rr_file_list->st_mode)) {
+            rr_file_list->blocks = blocks_count(rr_file_list->size);
+            LBA = LBA + rr_file_list->blocks;
+         }
       }
       rr_file_list = rr_file_list->next;
    }
@@ -644,8 +663,10 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
    char mdate_time[7];
    char adate_time[7];
    char cdate_time[7];
+   unsigned char *pSL = SL;
    int terminator_len = 0;
    int rr_save_size = 0;
+   int SL_len = 0;
    uint64_t mode = get_int32_LSB_MSB(rr_file_list->st_mode);
    uint64_t nlinks = get_int32_LSB_MSB(rr_file_list->st_nlink);
    uint64_t uid = get_int32_LSB_MSB(rr_file_list->st_uid);
@@ -736,7 +757,6 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
    if (type == ROOT_HEADER) {
       iso9660_cp2heap(&rr_directory_table_start, &directory_table_size, sizeof(uint8_t), NULL);
    }
-   
    /* Add record for directory '..' */
    else if (type == ISO9660_ROOT) {
       parent = parent_index[rr_file_list->parent_id - 1];
@@ -905,6 +925,8 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
       uint8_t rest = 0;
       RR[4] = 0;
       
+      if (S_ISLNK(rr_file_list->st_mode))
+         RR[4] |= 1 << 2;
       if ((init_fields & rrip_PX) != 0)
          RR[4] |= 1 << 0;                 // PX record in use
       if ((init_fields & rrip_TF) != 0)
@@ -943,8 +965,8 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
             iso9660_cp2heap(&rr_directory_table, NM, rest + 5, &directory_table_size);
          }
       }
-         
-      /* write PX record */
+      
+      /* Write PX record */
       if ((init_fields & rrip_PX) != 0) {
          iso9660_cp2heap(&rr_directory_table, PX, 4, &directory_table_size);
          iso9660_cp2heap(&rr_directory_table, &mode, sizeof(mode), &directory_table_size);
@@ -954,7 +976,15 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
          iso9660_cp2heap(&rr_directory_table, &ino, sizeof(ino), &directory_table_size);
       }
       
-      /* write TF record */
+      /* Write SL record */
+      if (S_ISLNK(rr_file_list->st_mode)) {
+         memset(SL, 0, sizeof(SL));
+         SL_len = SL_create(rr_file_list->name_path, &pSL);
+         
+         iso9660_cp2heap(&rr_directory_table, SL, SL_len, &directory_table_size);
+      }
+      
+      /* Write TF record */
       if ((init_fields & rrip_TF) != 0) {
          iso9660_cp2heap(&rr_directory_table, TF, 5, &directory_table_size);
          iso9660_cp2heap(&rr_directory_table, mdate_time, sizeof(mdate_time), &directory_table_size);       // Modify date/time

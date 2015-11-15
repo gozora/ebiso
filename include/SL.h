@@ -1,9 +1,9 @@
 /*
- * list.h
+ * SL.h
  * 
- * Version:       0.2.0
+ * Version:       0.1.0
  * 
- * Release date:  15.11.2015
+ * Release date:  13.11.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -26,14 +26,24 @@
  */
 
 #include "globals.h"
-#include "unistd.h"
 
-extern uint8_t filename_convert_name(char *input, char *output, enum conv_type_l type);
-extern int option_on_off(uint32_t option2check, enum opt_l option);
+#include <unistd.h>
+#include <error.h>
+#include <errno.h>
 
-/* ebiso.c */
-int list_create(const char *dirname, struct file_list_t **flist, struct ISO_data_t *ISO_data);
-void list_clean(struct file_list_t *list_to_clean);
+#define ROOT      1 << 3
+#define PARENT    1 << 2
+#define CURRENT   1 << 1
+#define INIT_MALLOC 0xff
+
+enum msg_l {
+   MSG_MALLOC,
+   MSG_REALLOC,
+   MSG_LONGLINK
+} msg_l;
 
 /* iso9660.c */
-struct file_list_t *list_search_name(struct file_list_t *file_list, char *needle);
+int SL_create(char *input, unsigned char **output);
+
+static void show_msg(enum msg_l msg_id, char *calling_function);
+static int check_realloc(int *total_len, int increment_by, unsigned char **output);
