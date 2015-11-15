@@ -1,9 +1,9 @@
 /*
  * SL.c
  * 
- * Version:       0.1.0
+ * Version:       0.1.1
  * 
- * Release date:  13.11.2015
+ * Release date:  15.11.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -189,6 +189,13 @@ int check_realloc(int *total_len, int increment_by, unsigned char **output) {
    /* Preparation for handling of longer links than 0xff bytes */
    rr_total_len += increment_by;
    
+   /* This will be improoved in the future */
+   if (rr_total_len > 0xff) {
+      show_msg(MSG_LONGLINK, "check_realloc");
+      rv = -2;
+      return rv;
+   }
+   
    if (rr_total_len > counter * INIT_MALLOC) {
       unsigned char *rr = NULL;
       
@@ -210,12 +217,6 @@ int check_realloc(int *total_len, int increment_by, unsigned char **output) {
    }
    
    *total_len = rr_total_len;
-   
-   /* This will be improoved in the future */
-   if (rr_total_len > 0xff) {
-      show_msg(MSG_LONGLINK, "check_realloc");
-      rv = -2;
-   }
    
    return rv;
 }

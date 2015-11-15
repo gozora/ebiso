@@ -9,4 +9,4 @@ Primary intention of ebiso was to create simple bootable UEFI ISO image for [Rea
  - more info can be found in [ebiso wiki](https://github.com/gozora/ebiso/wiki)
  - tested with rear on SLES11 SP3 and Centos 6.7
  - basic [usage](https://github.com/gozora/ebiso/wiki/Usage)
- - [features](https://github.com/gozora/ebiso/wiki/Features-in-progress) that can be expected
+ - [features](https://github.com/gozora/ebiso/wiki/Features-in-progress-(limitations)) that can be expected

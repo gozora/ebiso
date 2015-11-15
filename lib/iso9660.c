@@ -1,9 +1,9 @@
 /*
  * iso9660.c
  * 
- * Version:       0.3.0
+ * Version:       0.3.1
  * 
- * Release date:  14.11.2015
+ * Release date:  15.11.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -313,8 +313,11 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
                   /* Add potentional length of symlink (SL) record */
                   if (S_ISLNK(tmp_file_list->st_mode)) {
                      memset(SL, 0, sizeof(SL));
-                     if ((SL_len = SL_create(tmp_file_list->name_path, &pSL)) < 0)
+                     if ((SL_len = SL_create(tmp_file_list->name_path, &pSL)) < 0) {
+                        CEarr_destroy_list(&CE_list);
+                        free(NM);
                         return E_LNKFAIL;
+                     }
                      else
                         additional_bytes += SL_len;
                   }
