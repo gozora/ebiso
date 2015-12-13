@@ -1,9 +1,9 @@
 /*
  * CE.c
  * 
- * Version:       0.2.0
+ * Version:       0.2.1
  * 
- * Release date:  20.10.2015
+ * Release date:  13.12.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -37,8 +37,8 @@ int CE_assign_LBA(struct CE_list_t *CE_list, struct file_list_t *file_list, uint
       return E_MALLOC;
    
    if ((found = lfind(&parent_id, CE_list->pid, &(CE_list)->members, sizeof(int), compar)) == NULL) {
-#ifdef DEBUG
-      printf("DEBUG: CEarr_record_num(): PID: [%d] not found, inserting LBA: 0x%x\n", parent_id, *LBA);
+#if (DEBUG == 1)
+      printf("DEBUG: %s(): PID: [%d] not found, inserting LBA: 0x%x\n", __func__, parent_id, *LBA);
 #endif
       
       /* 
@@ -57,21 +57,27 @@ int CE_assign_LBA(struct CE_list_t *CE_list, struct file_list_t *file_list, uint
       
    }
    else {
-#ifdef DEBUG
-      printf("DEBUG: CEarr_record_num(): PID: [%d] found.\n", parent_id);
+#if (DEBUG == 1)
+      printf("DEBUG: %s(): PID: [%d] found.\n", __func__, parent_id);
 #endif
       element = (int*) found - (int*) CE_list->pid;
       file_list->CE_LBA = CE_list->lba[element];
+      /* Test */
+      file_list->CE_offset = CE_list->CE_used[element];
+      /* Test END*/
+      
       CE_list->CE_used[element] += CE_len;
+      
       
       /* CE have reached BLOCK_SIZE, allocate new LBA */
       if (CE_list->CE_used[element] > BLOCK_SIZE) {
-#ifdef DEBUG
-         printf("DEBUG: CEarr_record_num(): CE record for pid [%d] is longer than BLOCK_SIZE, assigning new LBA [0x%x]\n", CE_list->pid[element], *LBA);
+#if (DEBUG == 1)
+         printf("DEBUG: %s(): CE record for pid [%d] is longer than BLOCK_SIZE, assigning new LBA [0x%x]\n", __func__, CE_list->pid[element], *LBA);
 #endif
          CE_list->CE_used[element] = CE_len;
          CE_list->lba[element] = *LBA;
          file_list->CE_LBA = *LBA;
+         file_list->CE_offset = 0;
          (*LBA)++;
       }
    }
@@ -118,8 +124,8 @@ static int realloc_CE_list(struct CE_list_t *CE_list) {
                rv = E_MALLOC;
             }
             else {
-#ifdef DEBUG
-               printf("DEBUG: realloc_CE_list(): New space allocation success.\n");
+#if (DEBUG == 1)
+               printf("DEBUG: %s(): New space allocation success.\n", __func__);
 #endif
                CE_list->CE_used = rr;
                memset((CE_list)->CE_used + CE_list->members, 0, resize_by);
@@ -130,7 +136,7 @@ static int realloc_CE_list(struct CE_list_t *CE_list) {
    }
    
    if (rv == E_MALLOC)
-      printf("Error: realloc_CE_list(): Memory allocation failed\n");
+      Gdisplay_message(E_MALLOC, __func__);
    
    return rv;
 }
@@ -154,8 +160,8 @@ int CEarr_init_list(struct CE_list_t *CE_list, int arr_prealloc) {
    CE_list->members = 0;
    CE_list->arr_size = arr_prealloc * sizeof(int);
 
-#ifdef DEBUG
-   printf("DEBUG: CEarr_init_list(): Allocating new space: %zu bytes.\n", CE_list->arr_size);
+#if (DEBUG == 1)
+   printf("DEBUG: %s(): Allocating new space: %zu bytes.\n", __func__, CE_list->arr_size);
 #endif
 
    if ((CE_list->pid = (unsigned int *) malloc(CE_list->arr_size)) == NULL) {
@@ -178,7 +184,7 @@ int CEarr_init_list(struct CE_list_t *CE_list, int arr_prealloc) {
    }
    
    if (rv == E_MALLOC)
-      printf("Memory allocation error.\n");
+      Gdisplay_message(E_MALLOC, __func__);
    
    return rv;
 }

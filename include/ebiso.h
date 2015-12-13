@@ -1,9 +1,9 @@
 /*
  * ebiso.h
  * 
- * Version:       0.2.0
+ * Version:       0.2.1
  * 
- * Release date:  13.11.2015
+ * Release date:  13.12.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -33,9 +33,9 @@
 #include <getopt.h>
 
 #define PROGNAME "ebiso"
-#define VERSION "0.2.0"
+#define EBISO_VERSION "0.2.1"
 
-#ifdef DEBUG
+#if (DEBUG == 1)
 static void disp_level(struct file_list_t *list_to_display, int level);
 #endif
 
@@ -65,7 +65,7 @@ extern uint32_t iso9660_terminator(void **terminator);
 extern int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum endianity_l endianity, struct ISO_data_t *ISO_data);
 extern int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_data);
 extern int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct ISO_data_t *ISO_data);
-extern uint8_t do_pad(uint8_t len, enum pad_list_t type);
+extern int do_pad(int len, enum pad_list_t type);
 
 extern void et_boot_record_descr(void **boot_record_descriptor, struct ISO_data_t ISO_data);
 extern int et_boot_catalog(struct ISO_data_t LBA_data);

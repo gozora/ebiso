@@ -1,9 +1,9 @@
 /*
- * rockridge.c
+ * globals.c
  * 
  * Version:       0.1.0
  * 
- * Release date:  20.09.2015
+ * Release date:  13.12.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -25,5 +25,24 @@
  * 
  */
 
-#include "rockridge.h"
+#include <globals.h>
 
+enum errors_l Gdisplay_message(enum errors_l error, const char *calling_function_name) {
+   char msg[256];
+   
+   memset(msg, 0, sizeof(msg));
+   
+   switch(error) {
+      case E_MALLOC:
+         strncpy(msg, "Memory allocation problem.", sizeof(msg));
+      break;
+      
+      default:
+         strncpy(msg, "I don't know what to say.", sizeof(msg));
+      break;
+   }
+   
+   printf("Error: %s(): %s\n", calling_function_name, msg);
+   
+   return error;
+}

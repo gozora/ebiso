@@ -1,9 +1,9 @@
 /*
  * iso9660.h
  * 
- * Version:       0.3.0
+ * Version:       0.4.0
  * 
- * Release date:  15.11.2015
+ * Release date:  13.12.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -28,7 +28,8 @@
 #include "globals.h"
 #include <time.h>
 
-#define CE_LIST_PREALLOC 32
+#define CE_LIST_PREALLOC   32
+#define NM_HEADER_SIZE     5
 
 enum segment_list_t {
    ISO9660_ROOT,
@@ -63,7 +64,7 @@ extern struct file_list_t *list_search_name(struct file_list_t *file_list, char 
 extern int CE_assign_LBA(struct CE_list_t *CE_list, struct file_list_t *file_list, uint32_t *LBA);
 extern int CEarr_init_list(struct CE_list_t *CE_list, int arr_prealloc);
 extern void CEarr_destroy_list(struct CE_list_t *CE_list);
-extern int SL_create(char *input, unsigned char **output);
+extern int SL_create(char *input, unsigned char **output, int *output_len);
 
 /* ebiso.c */
 uint32_t iso9660_terminator(void **terminator);
@@ -71,7 +72,7 @@ uint32_t iso9660_header(void **header, struct file_list_t file_list, struct ISO_
 int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum endianity_l endianity, struct ISO_data_t *ISO_data);
 int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_data);
 int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct ISO_data_t *ISO_data);
-uint8_t do_pad(uint8_t len, enum pad_list_t type);
+int do_pad(int len, enum pad_list_t type);
 
 /* el_torito.c */
 void iso9660_cp2heap(void **dest, const void *source, long int size, uint32_t *dest_size);

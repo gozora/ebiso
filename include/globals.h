@@ -1,9 +1,9 @@
 /*
  * globals.h
  * 
- * Version:       0.5.0
+ * Version:       0.6.0
  * 
- * Release date:  14.11.2015
+ * Release date:  13.12.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -25,6 +25,8 @@
  * 
  */
 
+#define DEBUG 0
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,27 +34,34 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-//#define DEBUG 1
+#if (DEBUG == 1)
+#include <assert.h>
+#endif
 
-#define MAX_DIR_STR_LEN 512
-#define BLOCK_SIZE 2048
-#define LBA_ROOT 0x18
-#define ISO9660_ID "CD001"
-#define SYSTEM_ID "LINUX"
-#define VOLUME_ID "CDROM"
-#define DIR_RECORD_LEN 0x21
-#define PT_RECORD_LEN 0x8
-#define ARR_PREALLOC 20
-#define RRIP_INIT_FIELDS rrip_RR | rrip_PX | rrip_TF | rrip_NM
+#define ISO9660_ID         "CD001"
+#define SYSTEM_ID          "LINUX"
+#define VOLUME_ID          "CDROM"
+#define VERSION            1
+#define MAX_DIR_STR_LEN    512
+#define BLOCK_SIZE         2048
+#define LBA_ROOT           0x18
+#define DIR_RECORD_LEN     0x21
+#define PT_RECORD_LEN      0x8
+
+/* Which fields should be used in RRIP */
+#define RRIP_INIT_FIELDS   rrip_RR | rrip_PX | rrip_TF | rrip_NM
+
+/* Examples */
+//#define RRIP_INIT_FIELDS rrip_TF | rrip_PX
 //#define RRIP_INIT_FIELDS rrip_RR
 //#define RRIP_INIT_FIELDS rrip_NM
-//#define RRIP_INIT_FIELDS rrip_TF | rrip_PX
 
 #define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 
 static const uint8_t zero = 0;
 static const uint8_t one = 1;
 
+/* Global types */
 enum errors_l {
    E_OK,
    E_STATFAIL,
@@ -145,3 +154,6 @@ struct ISO_data_t {
    uint32_t path_table_offset;
    uint32_t options;
 } ISO_data_t;
+
+/* Global functions */
+enum errors_l Gdisplay_message(enum errors_l, const char *);

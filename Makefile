@@ -20,7 +20,7 @@ MAIN_LIB=${LIBDIR}/libmain.a
 MANDIR=/usr/share/man
 
 FLAGS=-g3 -m64 -std=gnu9x -Wall -Wshadow -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -I${INCLUDEDIR}
-VERSION=$(shell grep "\#define VERSION" ${INCLUDEDIR}/${PROGNAME}.h | awk '{ print $$NF }' | sed s/\"//g)
+VERSION=$(shell grep "\#define EBISO_VERSION" ${INCLUDEDIR}/${PROGNAME}.h | awk '{ print $$NF }' | sed s/\"//g)
 
 SRC=$(wildcard ${LIBDIR}/*.c)
 HEADERS=$(wildcard ${INCLUDEDIR}/*.h)

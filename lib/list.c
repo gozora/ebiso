@@ -1,9 +1,9 @@
 /*
  * list.c
  * 
- * Version:       0.2.0
+ * Version:       0.2.1
  * 
- * Release date:  14.11.2015
+ * Release date:  13.12.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -77,10 +77,7 @@ int list_create(const char *dirname, struct file_list_t **flist, struct ISO_data
          
          lstat(path, &dir_cont_stat);
          
-         /* 
-          * Dont do read test on symlinks as they dont need to have any real valid content 
-          * If RRIP is not used symlinks will be handled as hardlinks
-          */
+         /* Don't do read test on symlinks as they don't need to have any real valid content */
          if (S_ISLNK(dir_cont_stat.st_mode) && rock_ridge_on == TRUE) {
             memset((*flist)->name_path, 0, MAX_DIR_STR_LEN);
             if (readlink(path, (*flist)->name_path, MAX_DIR_STR_LEN - 1) == -1) {

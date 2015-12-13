@@ -1,9 +1,9 @@
 /*
  * iso9660.c
  * 
- * Version:       0.3.1
+ * Version:       0.4.0
  * 
- * Release date:  15.11.2015
+ * Release date:  13.12.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -32,9 +32,9 @@ unsigned char CE[28];
 unsigned char ER[237];
 unsigned char SP[7];
 unsigned char RR[5];
-unsigned char SL[255];              // 1<<2
 unsigned char PX[44];               // 1<<0
 unsigned char TF[26];               // 1<<7
+unsigned char *SL;                  // 1<<2
 unsigned char *NM;                  // 1<<3
 const enum rrip_fields_t init_fields = RRIP_INIT_FIELDS;
 
@@ -73,9 +73,9 @@ uint32_t iso9660_header(void **header, struct file_list_t file_list, struct ISO_
    uint32_t header_size = 0;
    time_t time_now = time(NULL);
    
-   char system_identifier[32] = VOLUME_ID;                                    // "LINUX"
-   char volume_identifier[32] = SYSTEM_ID;                                    // "CDROM"
-   uint64_t volume_space_size = get_int32_LSB_MSB(ISO_data.LBA_last);         // Size of whole ISO image in blocks ( * BLOCK_SIZE = ISO size [B])
+   char system_identifier[32] = SYSTEM_ID;                                    // "LINUX"
+   char volume_identifier[32] = VOLUME_ID;                                    // "CDROM"
+   uint64_t volume_space_size = get_int32_LSB_MSB(ISO_data.LBA_last + 1);     // Size of whole ISO image in blocks ( * BLOCK_SIZE = ISO size [B]) + 1 empty block at the end
    uint32_t volume_set_size = get_int16_LSB_MSB(one);
    uint32_t volume_sequence_number = get_int16_LSB_MSB(one);
    uint32_t logical_block_size = get_int16_LSB_MSB(BLOCK_SIZE);
@@ -193,7 +193,8 @@ int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum en
          }
          
          /* Dynamic memory allocation BEGIN */
-         entry_len = PT_RECORD_LEN + rr_file_list->name_conv_len + pad_len;
+         entry_len = PT_RECORD_LEN + pad_len;
+         
          mem_free -= entry_len;
 
          if (mem_free < 0) {
@@ -206,8 +207,7 @@ int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum en
                rr_path_table = path_table_start + path_table_size;
             }
             else {
-               printf("Error: iso9660_path_table(): Memory allocation failed\n");
-               rv = E_MALLOC;
+               rv = Gdisplay_message(E_MALLOC, __func__);
                break;
             }
          }
@@ -217,7 +217,7 @@ int iso9660_path_table(struct file_list_t *file_list, void **path_table, enum en
          iso9660_cp2heap(&rr_path_table, &zero, sizeof(uint8_t), &path_table_size);                                             // Extended attr record
          iso9660_cp2heap(&rr_path_table, &LBA, sizeof(uint32_t), &path_table_size);                                             // LBA
          iso9660_cp2heap(&rr_path_table, &parent_id, sizeof(uint16_t), &path_table_size);                                       // Parent dir ID
-         iso9660_cp2heap(&rr_path_table, rr_file_list->name_conv, rr_file_list->name_conv_len + pad_len, &path_table_size);     // Dir name
+         iso9660_cp2heap(&rr_path_table, rr_file_list->name_conv, pad_len, &path_table_size);                                   // Dir name
       }
       
       rr_file_list = rr_file_list->next;
@@ -239,23 +239,22 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
    int total_len = 0;
    int dir_rec_len = 0;
    int counter = 1;
-   int min_dir_len = 2 * (DIR_RECORD_LEN + 1);                       // Directory recod begins with two entries of directory it self
    int additional_bytes = 0;
    int rock_ridge_header_size = 0;
    int SL_len = 0;
    int rv = E_OK;
-   unsigned char *pSL = SL;
    uint32_t LBA = LBA_ROOT + (2 * ISO_data->path_table_offset);      // Move first LBA if path tables are larger that BLOCK_SIZE
-   uint8_t pad_len = 0;
    uint8_t terminator_len = 0;
    bool_t rock_ridge_on = FALSE;
+   int current_len = 0;
+   int parent_len = 0;
+   int empty_dir_len = 0;
    
    memset(&CE_list, 0, sizeof(CE_list));
    
    if (option_on_off(ISO_data->options, OPT_R) == E_OK) {
       rock_ridge_header_size = init_RRIP();
-      pad_len = do_pad(rock_ridge_header_size, PAD_ODD);
-      min_dir_len += (2 * rock_ridge_header_size) + (2 * pad_len);   // 2 records at the beginning of directory record
+      
       rock_ridge_on = TRUE;
    }
    
@@ -268,19 +267,21 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
    /* Assign LBAs to directories first */
    while(rr_file_list->next != NULL) {
       if (S_ISDIR(rr_file_list->st_mode)) {
-         
-         tmp_file_list = file_list;
          total_len = 0;
          counter = 1;
-         dir_rec_len = min_dir_len;
+         tmp_file_list = file_list;
+         empty_dir_len = do_pad((DIR_RECORD_LEN + 1) + rock_ridge_header_size, PAD_ODD);
+         dir_rec_len = 2 * empty_dir_len;                                                                   // Min directory record will contain at least '.' and '..'
          
          /* Absolute root directory will have SP & CE on top */
          if (strncmp(rr_file_list->name_path, ".", 2) == 0 && rock_ridge_on == TRUE) {
-            dir_rec_len += (sizeof(SP) + sizeof(CE) + 1);
+            current_len = do_pad(DIR_RECORD_LEN + 1 + rock_ridge_header_size + (sizeof(SP) + sizeof(CE)), PAD_ODD);
+            parent_len  = do_pad(DIR_RECORD_LEN + 1 + rock_ridge_header_size, PAD_ODD);
+            
+            dir_rec_len = current_len + parent_len;
             
             /* Calculate and allign absolute root entry length */
-            rr_file_list->ISO9660_len = rock_ridge_header_size + (DIR_RECORD_LEN + 1) + sizeof(SP) + sizeof(CE);
-            (rr_file_list->ISO9660_len % 2 == 0) ? rr_file_list->ISO9660_len : rr_file_list->ISO9660_len++;
+            rr_file_list->ISO9660_len = current_len;
             
             /* CE entry should always exist for absolute root */
             rr_file_list->CE_LBA = 1;
@@ -297,29 +298,37 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
                continue;
             }
             else if (tmp_file_list->parent_id == rr_file_list->dir_id) {
-               int rr_len = 0;         // Represent individual len of each record
+               int rr_len = 0;                                                                              // Represent individual len of each record
                
-               pad_len = do_pad(tmp_file_list->name_conv_len, PAD_EVEN);
                terminator_len = set_terminator_len(tmp_file_list->st_mode);
                
                /* Size of basic iso9660 directory record */
-               dir_rec_len += DIR_RECORD_LEN + tmp_file_list->name_conv_len + terminator_len + pad_len;
-               rr_len = DIR_RECORD_LEN + tmp_file_list->name_conv_len + terminator_len + pad_len;
+               rr_len =  do_pad(DIR_RECORD_LEN + tmp_file_list->name_conv_len + terminator_len, PAD_ODD);
+               dir_rec_len += rr_len;
                
                if (rock_ridge_on == TRUE) {
                   if ((init_fields & rrip_NM) != 0)
-                     additional_bytes = tmp_file_list->name_short_len + 5;
+                     additional_bytes = tmp_file_list->name_short_len + NM_HEADER_SIZE;
+                  else
+                     additional_bytes = 0;
                   
                   /* Add potentional length of symlink (SL) record */
                   if (S_ISLNK(tmp_file_list->st_mode)) {
-                     memset(SL, 0, sizeof(SL));
-                     if ((SL_len = SL_create(tmp_file_list->name_path, &pSL)) < 0) {
+#if (DEBUG == 1)
+                     printf("DEBUG: %s(): Symlink name: [%s]\n", __func__, tmp_file_list->name_short);
+#endif
+                     if ((rv = SL_create(tmp_file_list->name_path, &SL, &SL_len)) != E_OK) {
+                        if (rv == E_LNKFAIL)
+                           printf("Error: %s(): Working with symlink [%s] failed.\n", __func__, tmp_file_list->name_short);
+                        
                         CEarr_destroy_list(&CE_list);
                         free(NM);
-                        return E_LNKFAIL;
+                        return rv;
                      }
-                     else
-                        additional_bytes += SL_len;
+                     else {
+                        additional_bytes += (SL_len);
+                        free(SL);
+                     }
                   }
                   
                   dir_rec_len += rock_ridge_header_size + additional_bytes;
@@ -327,12 +336,12 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
                   
                   /* 
                    * Set flag for CE creation if entry is longer than 255 bytes.
-                   * tmp_file_list->full_len is used only if CE record is needed,
+                   * tmp_file_list->full_len is used only if CE record is in use,
                    * otherwise tmp_file_list->ISO9660 is sufficient.
                    */
                   if (rr_len >= 0xFF) {
                      tmp_file_list->CE_LBA = 1;
-                     tmp_file_list->ISO9660_len = DIR_RECORD_LEN + tmp_file_list->name_conv_len + terminator_len + pad_len + sizeof(CE);
+                     tmp_file_list->ISO9660_len = do_pad(DIR_RECORD_LEN + tmp_file_list->name_conv_len + terminator_len + sizeof(CE), PAD_ODD);
                      
                      dir_rec_len -= rock_ridge_header_size + additional_bytes;
                      dir_rec_len += sizeof(CE);
@@ -345,19 +354,17 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
                       * Without this NM entry len could overfow.
                       */
                      if (tmp_file_list->name_short_len >= 250)
-                        tmp_file_list->full_len += 5;             // Count in another 5 bytes for NM entry header
+                        tmp_file_list->full_len += NM_HEADER_SIZE;
                      
                      /* Allign to even bytes count in the end */
-                     (tmp_file_list->full_len % 2 == 0) ? tmp_file_list->full_len : (tmp_file_list)->full_len++;
-                     
+                     tmp_file_list->full_len = do_pad(tmp_file_list->full_len, PAD_ODD);
                   }
                   else {
-                     (rr_len % 2 == 0) ? rr_len : rr_len++;
-                     tmp_file_list->ISO9660_len = rr_len;
+                     tmp_file_list->ISO9660_len = do_pad(rr_len, PAD_ODD);
                   }
                   
                   /* Allign to even bytes count in the end */
-                  (dir_rec_len % 2 == 0) ? dir_rec_len : dir_rec_len++;
+                  dir_rec_len = do_pad(dir_rec_len, PAD_ODD);
                }
                
                /* Allign entry at the end of the block */
@@ -376,7 +383,7 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
          }
          
          if (total_len == 0)
-            total_len = min_dir_len;
+            total_len = 2 * empty_dir_len;
          
          rr_file_list->size = total_len;
          rr_file_list->blocks = blocks_count(total_len);
@@ -460,6 +467,7 @@ int iso9660_assign_LBA(struct file_list_t *file_list, struct ISO_data_t *ISO_dat
           * Symlink can point to arbitrary LBA
           */
          if (!S_ISLNK(rr_file_list->st_mode)) {
+            rr_file_list->LBA = LBA;
             rr_file_list->blocks = blocks_count(rr_file_list->size);
             LBA = LBA + rr_file_list->blocks;
          }
@@ -492,19 +500,17 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
       rock_ridge_on = TRUE;
    
    if ((directory_table_start = (void *) malloc(directory_table_size)) == NULL) {
-      printf("Error: iso9660_path_table(): Memory allocation failed\n");
-      rv = E_MALLOC;
+      rv = Gdisplay_message(E_MALLOC, __func__);
       goto cleanup;
    }
    
    if ((parent_index = (struct file_list_t **) malloc(parent_index_size)) == NULL ) {
-      printf("Error: iso9660_path_table(): Memory allocation failed.\n");
-      rv = E_MALLOC;
+      rv = Gdisplay_message(E_MALLOC, __func__);
       goto cleanup;
    }
    else
       memset(parent_index, 0, parent_index_size);
-   
+
    while(rr_file_list->next != NULL) {
       
       /* Skip files */
@@ -537,9 +543,9 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
        */
       tmp_file_list = file_list;
       int CE_offset = 0;
-      uint32_t CE_save_LBA = 0;
+      //uint32_t CE_save_LBA = 0;
       while(tmp_file_list->next != NULL) {
-         
+      
          /*
           * Root entry in list was artificially created.
           * Following condition will skip it
@@ -552,6 +558,7 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
             type = (rock_ridge_on == TRUE) ? RRIP : ISO9660;
             
             entry_len = construct_dir_record(tmp_file_list, NULL, &directory_table, type);
+            
             bytes_written += entry_len;
             
              /* Create CE record if needed */
@@ -566,15 +573,17 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
                uint8_t pad_len = 0;
                uint8_t terminator_len = 0;
                
-               if (CE_save_LBA == 0)
-                  CE_save_LBA = tmp_file_list->CE_LBA;
+               //if (CE_save_LBA == 0)
+                  //CE_save_LBA = tmp_file_list->CE_LBA;
                
-               if (CE_save_LBA != tmp_file_list->CE_LBA)
-                  CE_offset = 0;
+               //if (CE_save_LBA != tmp_file_list->CE_LBA)
+                  //CE_offset = 0;
+               
+               CE_offset = tmp_file_list->CE_offset;
                
                terminator_len = set_terminator_len(tmp_file_list->st_mode);
                pad_len = do_pad(tmp_file_list->name_conv_len, PAD_EVEN);                                       // Dir record must start on EVEN byte
-               basic_iso9660_len = DIR_RECORD_LEN + tmp_file_list->name_conv_len + pad_len + terminator_len;   // Length of basic dir record (without SUSP or RRIP)
+               basic_iso9660_len = DIR_RECORD_LEN + pad_len + terminator_len;                                  // Length of basic dir record (without SUSP or RRIP)
                CE_LBA = get_int32_LSB_MSB(tmp_file_list->CE_LBA);
                CE_len = get_int32_LSB_MSB(entry_len - basic_iso9660_len);
                CE_offset_LSB_MSB = get_int32_LSB_MSB(CE_offset);
@@ -600,10 +609,10 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
                bytes_written += tmp_file_list->ISO9660_len;
                entry_len = tmp_file_list->ISO9660_len;
                
-               tmp_file_list->CE_offset = CE_offset;
-               CE_offset += (tmp_file_list->full_len - tmp_file_list->ISO9660_len);
+               //tmp_file_list->CE_offset = CE_offset;
+               //CE_offset += (tmp_file_list->full_len - tmp_file_list->ISO9660_len);
                
-               CE_save_LBA = tmp_file_list->CE_LBA;
+               //CE_save_LBA = tmp_file_list->CE_LBA;
             }
             
             /* Allign directory entry to BLOCK_SIZE */
@@ -619,7 +628,7 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
          
          tmp_file_list = tmp_file_list->next;
       }
-      
+
       fseek(dest, rr_file_list->LBA * BLOCK_SIZE, SEEK_SET);
       fwrite(directory_table_start, 1, rr_file_list->blocks * BLOCK_SIZE, dest);
       
@@ -645,13 +654,12 @@ cleanup:
    return rv;
 }
 
-uint8_t do_pad(uint8_t len, enum pad_list_t type) {
-   uint8_t pad_len = 0;
+int do_pad(int len, enum pad_list_t type) {
    
    if ((type == PAD_EVEN && len % 2 == 0) || (type == PAD_ODD && len % 2 != 0))
-      pad_len = 1;
+      len++;
    
-   return pad_len;
+   return len;
 }
 
 static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_list_t **parent_index, void **directory_table_output, enum segment_list_t type) {
@@ -666,7 +674,6 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
    char mdate_time[7];
    char adate_time[7];
    char cdate_time[7];
-   unsigned char *pSL = SL;
    int terminator_len = 0;
    int rr_save_size = 0;
    int SL_len = 0;
@@ -718,7 +725,7 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
    
    iso9660_data.LBA = get_int32_LSB_MSB(rr_file_list->LBA);
    strncpy(iso9660_data.mdate_time, mdate_time, sizeof(iso9660_data.mdate_time));
-   pad_len = do_pad(rr_file_list->name_conv_len, PAD_EVEN);
+   pad_len = (rr_file_list->name_conv_len % 2 == 0) ? 1 : 0;                                 // Do padding of EVEN lengths
    
    if (S_ISDIR(rr_file_list->st_mode)) {
       terminator_len = 0;
@@ -733,7 +740,7 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
    
    if (type == ISO9660_ROOT || type == ROOT_HEADER || type == RRIP_ROOT) {
       pad_len = 0;
-      iso9660_data.name_len = 1;                                                                        // Lenght of roor dir name is always 1
+      iso9660_data.name_len = 1;                                                             // Lenght of roor dir name is always 1
    }
    else {
       iso9660_data.name_len = rr_file_list->name_conv_len + terminator_len;
@@ -936,7 +943,8 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
          RR[4] |= 1 << 7;                 // TF record in use
       if ((init_fields & rrip_NM) != 0) {
          RR[4] |= 1 << 3;                 // NM record in use
-         memset(NM + 5, 0, BLOCK_SIZE - 5);
+         
+         memset(NM + NM_HEADER_SIZE, 0, BLOCK_SIZE - NM_HEADER_SIZE);
       
          /* Prepare for another possible NM entry */
          if (rr_file_list->name_short_len >= 250) {
@@ -944,8 +952,8 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
             rr_file_list->name_short_len = 250;
          }
          
-         NM[2] = 5 + rr_file_list->name_short_len;
-         strncpy((char *)NM + 5, rr_file_list->name_short, rr_file_list->name_short_len);
+         NM[2] = NM_HEADER_SIZE + rr_file_list->name_short_len;
+         strncpy((char *)NM + NM_HEADER_SIZE, rr_file_list->name_short, rr_file_list->name_short_len);
       }
       
       if ((init_fields & rrip_RR) != 0)
@@ -956,16 +964,16 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
          if (rest != 0)
             NM[4] = 1;
          
-         iso9660_cp2heap(&rr_directory_table, NM, rr_file_list->name_short_len + 5, &directory_table_size);
+         iso9660_cp2heap(&rr_directory_table, NM, rr_file_list->name_short_len + NM_HEADER_SIZE, &directory_table_size);
          
          /* Add second NM entry if needed */
          if (rest != 0) {
             memset(NM + 4, 0, BLOCK_SIZE - 4);
-            NM[2] = 5 + rest;
+            NM[2] = NM_HEADER_SIZE + rest;
             
             strncpy((char *)NM + 5, rr_file_list->name_short + rr_file_list->name_short_len, rest);
             
-            iso9660_cp2heap(&rr_directory_table, NM, rest + 5, &directory_table_size);
+            iso9660_cp2heap(&rr_directory_table, NM, rest + NM_HEADER_SIZE, &directory_table_size);
          }
       }
       
@@ -981,10 +989,11 @@ static uint32_t construct_dir_record(struct file_list_t *file_list, struct file_
       
       /* Write SL record */
       if (S_ISLNK(rr_file_list->st_mode)) {
-         memset(SL, 0, sizeof(SL));
-         SL_len = SL_create(rr_file_list->name_path, &pSL);
+         SL_create(rr_file_list->name_path, &SL, &SL_len);
          
          iso9660_cp2heap(&rr_directory_table, SL, SL_len, &directory_table_size);
+         
+         free(SL);
       }
       
       /* Write TF record */

@@ -1,9 +1,9 @@
 /*
  * ebiso.c
  * 
- * Version:       0.2.0
+ * Version:       0.2.1
  * 
- * Release date:  15.11.2015
+ * Release date:  13.12.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -213,22 +213,22 @@ int main(int argc, char *argv[]) {
    /* If write of files failed, get rid of output iso file */
    if ((rv = iso9660_directory_record(list, fp, &ISO_data)) != E_OK)                // 0xC000
       unlink(ISO_data.iso_file);
-
+   else {
+      fseek(fp, BLOCK_SIZE - 1, SEEK_CUR);
+      fwrite(&zero, 1, 1, fp);                                                      // Write one empty block at the end
+   }
+   
    fclose(fp);
    
-#ifdef DEBUG
-   printf("DEBUG: main(): Number of directories: [%d]\n", ISO_data.dir_count);
+#if (DEBUG == 1)
+   printf("DEBUG: %s(): Number of directories: [%d]\n", __func__, ISO_data.dir_count);
    int i = 0;
-   switch (DEBUG) {
-      case 1:
-         printf("DEBUG: main(): MAIN STRUCTURE DUMP:\n");
-         printf("%-5s %-4s %-55s %-11s %-3s %-9s %-5s %-7s %-12s %-5s %-11s %-6s %-8s %-7s\n", \
-            "Level", "PID", "Name", "Size", "ID", "LBA", "Flag", "Blocks", "conf_name", \
-            "Len", "ISO9660_len", "CE_LBA", "Full_len", "CE_off");
-         for (i = 0; i <= 128; i++)
-            disp_level(list, i);
-      break;
-   }
+   printf("DEBUG: %s(): MAIN STRUCTURE DUMP:\n", __func__);
+   printf("%-5s %-4s %-55s %-11s %-3s %-9s %-5s %-7s %-12s %-5s %-11s %-6s %-8s %-7s\n", \
+      "Level", "PID", "Name", "Size", "ID", "LBA", "Flag", "Blocks", "conf_name", \
+      "Len", "ISO9660_len", "CE_LBA", "Full_len", "CE_off");
+   for (i = 0; i <= 128; i++)
+      disp_level(list, i);
 #endif
 
 cleanup:
@@ -248,7 +248,7 @@ cleanup:
    return rv;
 }
 
-#ifdef DEBUG
+#if (DEBUG == 1)
 static void disp_level(struct file_list_t *list_to_display, int level) {
    char flag = 0;
    struct tm *ts;
@@ -368,7 +368,7 @@ Arguments:\n\
   -v, --version                        Display version.\n", PROGNAME, PROGNAME, PROGNAME);
    }
    else if (id == MSG_VERSION)
-      printf("%s\n", VERSION);
+      printf("%s\n", EBISO_VERSION);
 }
 
 static void err_msg(enum errors_l error) {
@@ -386,7 +386,7 @@ static uint32_t get_path_table_offset(struct file_list_t *file_list) {
       if (S_ISDIR(file_list->st_mode)) {
          pad_len = do_pad(file_list->name_conv_len, PAD_ODD);
          
-         path_table_size += PT_RECORD_LEN + file_list->name_conv_len + pad_len;
+         path_table_size += PT_RECORD_LEN + pad_len;
       }
       
       file_list = file_list->next;

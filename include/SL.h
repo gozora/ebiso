@@ -1,9 +1,9 @@
 /*
  * SL.h
  * 
- * Version:       0.1.0
+ * Version:       0.2.1
  * 
- * Release date:  13.11.2015
+ * Release date:  13.12.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -31,19 +31,45 @@
 #include <error.h>
 #include <errno.h>
 
-#define ROOT      1 << 3
-#define PARENT    1 << 2
-#define CURRENT   1 << 1
-#define INIT_MALLOC 0xff
+#define ROOT            1 << 3
+#define PARENT          1 << 2
+#define CURRENT         1 << 1
+#define SL_HEADER_SIZE  5
+#define SL_PREALLOC     128                   // Size of memory chunk for unsplited SL record
 
-enum msg_l {
-   MSG_MALLOC,
-   MSG_REALLOC,
-   MSG_LONGLINK
-} msg_l;
+/* 
+ * At what length will SL record split.
+ * Must be minimum SL_HEADER_SIZE + 5 (5 = 2*(flag + length) + (at least) one component character)
+ */
+#define SL_MAX_LEN      250
+
+struct buffer_data_t {
+   unsigned char *poutput_start;
+   unsigned char *pbuff;
+   unsigned char *pcomponent_len;
+   unsigned char *pSL_len;
+   unsigned char *pflags;
+   int total_len;
+   int blocks_allocated;
+   uint16_t component_len;
+} buffer_data_t;
+
+struct save_data_t {
+   unsigned char *start;
+   unsigned char *SLlen_save;
+   unsigned char *SLflag_save;
+   unsigned char *component_flag_save;
+   unsigned char *component_len_save;
+   int mem_free;
+   int blocks_allocated;
+   size_t inital_alloc;
+} save_data_t;
 
 /* iso9660.c */
-int SL_create(char *input, unsigned char **output);
+int SL_create(char*, unsigned char**, int*);
 
-static void show_msg(enum msg_l msg_id, char *calling_function);
-static int check_realloc(int *total_len, int increment_by, unsigned char **output);
+static int split_SL_record(unsigned char*, int, unsigned char**, int*);
+static unsigned char *write_data(char, unsigned char**, int*);
+static void write_SL_header(unsigned char**, struct save_data_t*);
+static int check_realloc_main(struct buffer_data_t*, int);
+static int check_realloc_part(struct save_data_t*, int, unsigned char**);
