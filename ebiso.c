@@ -1,9 +1,9 @@
 /*
  * ebiso.c
  * 
- * Version:       0.2.1
+ * Version:       0.2.2
  * 
- * Release date:  13.12.2015
+ * Release date:  2.4.2015
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -214,6 +214,7 @@ int main(int argc, char *argv[]) {
    if ((rv = iso9660_directory_record(list, fp, &ISO_data)) != E_OK)                // 0xC000
       unlink(ISO_data.iso_file);
    else {
+      fseek(fp, 0, SEEK_END);
       fseek(fp, BLOCK_SIZE - 1, SEEK_CUR);
       fwrite(&zero, 1, 1, fp);                                                      // Write one empty block at the end
    }
