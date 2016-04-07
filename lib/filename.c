@@ -1,9 +1,9 @@
 /*
  * filename.c
  * 
- * Version:       0.1.1
+ * Version:       0.1.2
  * 
- * Release date:  20.09.2015
+ * Release date:  07.04.2016
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -70,7 +70,7 @@ static char *add_duplicate_couter(char *input, int counter, uint8_t *input_len) 
    memset(save_ext, 0, sizeof(save_ext));
    
    /* Can't be done with memset. Valgrind doesn't like it */
-   strncpy(prepad_nulls, "000", 4);
+   strncpy(prepad_nulls, "000", 3);
    
    /* Get pointers to name and extension */
    filename_explode(input, &name, &ext, CONV_ISO9660);
@@ -88,8 +88,13 @@ static char *add_duplicate_couter(char *input, int counter, uint8_t *input_len) 
    if (counter > 999)
       printf("Warning: Duplicity counter too large, file might be unreadable on target ISO\n");
    
-   /* For padding purposes, how many '0' chars should be prepadded */
-   counter_digits = log10(counter) + 1;
+   /* log(0) is undefined */
+   if (counter == 0)
+      counter_digits = 1;
+   else {
+      /* For padding purposes, how many '0' chars should be prepadded */
+      counter_digits = log10(counter) + 1;
+   }
    
    /* Create counter string (e.g. 001, 066, 123 ...)*/
    snprintf(str_counter, sizeof(str_counter), "%.*s%d", (int) (sizeof(prepad_nulls) - counter_digits), prepad_nulls, counter);

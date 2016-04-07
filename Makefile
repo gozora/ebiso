@@ -19,6 +19,7 @@ LIBS=-L${LIBDIR} -lmain -lm
 MAIN_LIB=${LIBDIR}/libmain.a
 MANDIR=/usr/share/man
 
+#FLAGS=-fmessage-length=0 -grecord-gcc-switches -O2 -Wall -D_FORTIFY_SOURCE=2 -fstack-protector -funwind-tables -fasynchronous-unwind-tables -I${INCLUDEDIR}
 FLAGS=-g3 -m64 -std=gnu9x -Wall -Wshadow -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -I${INCLUDEDIR}
 VERSION=$(shell grep "\#define EBISO_VERSION" ${INCLUDEDIR}/${PROGNAME}.h | awk '{ print $$NF }' | sed s/\"//g)
 

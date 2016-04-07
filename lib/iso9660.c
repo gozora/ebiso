@@ -1,9 +1,9 @@
 /*
  * iso9660.c
  * 
- * Version:       0.4.0
+ * Version:       0.4.1
  * 
- * Release date:  13.12.2015
+ * Release date:  07.04.2016
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -29,7 +29,7 @@
 
 /* Rockridge */
 unsigned char CE[28];
-unsigned char ER[237];
+unsigned char ER[238];
 unsigned char SP[7];
 unsigned char RR[5];
 unsigned char PX[44];               // 1<<0
@@ -543,7 +543,6 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
        */
       tmp_file_list = file_list;
       int CE_offset = 0;
-      //uint32_t CE_save_LBA = 0;
       while(tmp_file_list->next != NULL) {
       
          /*
@@ -573,12 +572,6 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
                uint8_t pad_len = 0;
                uint8_t terminator_len = 0;
                
-               //if (CE_save_LBA == 0)
-                  //CE_save_LBA = tmp_file_list->CE_LBA;
-               
-               //if (CE_save_LBA != tmp_file_list->CE_LBA)
-                  //CE_offset = 0;
-               
                CE_offset = tmp_file_list->CE_offset;
                
                terminator_len = set_terminator_len(tmp_file_list->st_mode);
@@ -591,7 +584,7 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
                fseek(dest, (tmp_file_list->CE_LBA * BLOCK_SIZE) + CE_offset, SEEK_SET);
                fwrite(rr_save_ptr + basic_iso9660_len, 1, entry_len - basic_iso9660_len, dest);                // Write everything after standard dir record
                
-               memset(rr_CE, 0, BLOCK_SIZE - 4);
+               memset(rr_CE, 0, sizeof(CE) - 4);
                iso9660_cp2heap(&rr_CE, &CE_LBA, sizeof(CE_LBA), &rr_write);                                    // rr_write is here only to ensure move of pointer
                iso9660_cp2heap(&rr_CE, &CE_offset_LSB_MSB, sizeof(CE_offset_LSB_MSB), &rr_write);
                iso9660_cp2heap(&rr_CE, &CE_len, sizeof(CE_len), &rr_write);
@@ -608,11 +601,6 @@ int iso9660_directory_record(struct file_list_t *file_list, FILE *dest, struct I
                directory_table += tmp_file_list->ISO9660_len;
                bytes_written += tmp_file_list->ISO9660_len;
                entry_len = tmp_file_list->ISO9660_len;
-               
-               //tmp_file_list->CE_offset = CE_offset;
-               //CE_offset += (tmp_file_list->full_len - tmp_file_list->ISO9660_len);
-               
-               //CE_save_LBA = tmp_file_list->CE_LBA;
             }
             
             /* Allign directory entry to BLOCK_SIZE */
