@@ -1,7 +1,7 @@
 /*
  * ebiso.h
  * 
- * Version:       0.2.2
+ * Version:       0.2.3
  * 
  * Release date:  2.4.2015
  * 
@@ -33,7 +33,7 @@
 #include <getopt.h>
 
 #define PROGNAME "ebiso"
-#define EBISO_VERSION "0.2.2"
+#define EBISO_VERSION "0.2.3"
 
 #if (DEBUG == 1)
 static void disp_level(struct file_list_t *list_to_display, int level);
