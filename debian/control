@@ -1,0 +1,16 @@
+Source: ebiso
+Section: otherosfs
+Priority: optional
+Maintainer: Vladimir (sodoma) Gozora <c@gozora.sk>
+Build-Depends: debhelper (>= 9)
+Standards-Version: 3.9.5
+Homepage: https://github.com/gozora/ebiso/wiki
+Vcs-Git: git://github.com/gozora/ebiso
+Vcs-Browser: https://github.com/gozora/ebiso
+
+Package: ebiso
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: create UEFI bootable ISO images
+ Ebiso is a small program written in C, that creates UEFI bootable ISO image
+ no additional dependencies. 
