@@ -46,6 +46,8 @@ enabled UEFI boot.
 %{mandir}/man1/%{name}.1.gz
 
 %changelog
+* Tue Feb 28 2017 Vladimir Gozora <c@gozora.sk> - 0.2.5-%{release}
+  Corrected segfault wiht XFS ftype=0
 * Tue Dec 13 2015 Vladimir Gozora <c@gozora.sk> - 0.2.1-%{release}
   Full symbolic link support
 * Tue Oct 27 2015 Vladimir Gozora <c@gozora.sk> - 0.1.4-%{release}

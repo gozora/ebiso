@@ -1,9 +1,9 @@
 /*
  * list.c
  * 
- * Version:       0.2.1
+ * Version:       0.2.2
  * 
- * Release date:  13.12.2015
+ * Release date:  28.2.2017
  * 
  * Copyright 2015 Vladimir (sodoma) Gozora <c@gozora.sk>
  * 
@@ -126,7 +126,7 @@ int list_create(const char *dirname, struct file_list_t **flist, struct ISO_data
       }
       
       /* Recursion to child directory */
-      if ( !(dir_content->d_type ^ DT_DIR) && (rv == E_OK) ) {
+      if ( S_ISDIR(dir_cont_stat.st_mode) && (rv == E_OK) ) {
          rr_dir = parent_id;
          parent_id = dir_id;
          
