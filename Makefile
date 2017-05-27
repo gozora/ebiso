@@ -23,7 +23,7 @@ MANDIR=/usr/share/man
 FLAGS=$(CFLAGS) -g3 -std=gnu9x -Wall -Wshadow -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -I${INCLUDEDIR}
 VERSION=$(shell grep "\#define EBISO_VERSION" ${INCLUDEDIR}/${PROGNAME}.h | awk '{ print $$NF }' | sed s/\"//g)
 
-SRC=$(wildcard ${LIBDIR}/*.c)
+SRC=$(sort $(wildcard ${LIBDIR}/*.c))
 HEADERS=$(wildcard ${INCLUDEDIR}/*.h)
 OBJ=$(addprefix ${LIBDIR}/,$(notdir $(SRC:.c=.o)))
 
