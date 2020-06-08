@@ -33,7 +33,7 @@
 #include <getopt.h>
 
 #define PROGNAME "ebiso"
-#define EBISO_VERSION "0.2.6"
+#define EBISO_VERSION "0.2.7"
 
 #if (DEBUG == 1)
 static void disp_level(struct file_list_t *list_to_display, int level);
